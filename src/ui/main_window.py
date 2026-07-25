@@ -144,7 +144,13 @@ class MainWindow(QWidget):
         self._height_anim.setEndValue(height)
         self._height_anim.start()
 
-        # Set the shadow focus to first result if none shadow focused.
+        # Remove old shadow focus
+        for res_box in self._result_boxes:
+            if res_box.shadow_focus:
+                res_box.set_shadow_focus(False)
+                break  # assuming only one result box was shadow focused
+
+        # Set the shadow focus to first result.
         if self._result_boxes:
             self._shadow_focused_idx = 0
             for res_box in self._result_boxes:
