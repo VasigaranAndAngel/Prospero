@@ -1,0 +1,55 @@
+[project]
+name = "Prospero"
+description = ""
+version = "0.0.1"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "keyboard>=0.13.5",
+    "pyqtgraph>=0.14.0",
+    "pyside6>=6.11.1",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.1",
+    "pyside-widget-reloader>=0.0.3",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = ["-s"]
+
+[tool.ruff]
+select = ["I"]
+line-length = 100
+
+[tool.pyrefly]
+# Python version/platform
+python-version = "3.13"
+python-platform = "all"
+
+# Behave more like a strict checker
+check-unannotated-defs = true
+infer-return-types = "checked"
+
+# More strict callable compatibility
+strict-callable-subtyping = true
+
+# Respect existing pyright ignores
+permissive-ignores = true
+
+project-includes = [
+    "src",
+    "tests",
+]
+
+project-excludes = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/build",
+    "**/dist",
+]
