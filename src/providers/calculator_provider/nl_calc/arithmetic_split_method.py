@@ -1,5 +1,6 @@
 import math
 import re
+import string
 from collections.abc import Callable, Iterable
 from decimal import Decimal
 
@@ -164,10 +165,13 @@ def _evaluator(expression: str) -> Value:
     for pat, base in {(_BINARY_PAT, 2), (_OCTAL_PAT, 8), (_HEX_PAT, 16)}:
         if match := pat.match(expression.lower()):
             groups = match.groups()
-            val = int(groups[0], base)
+            val = int(groups[0] or "0", base)  # `x.a` expression gives (None, "a", None).
             dec_val = 0
             if groups[1] is not None:
-                dec_val = sum(int(d) * base ** -(i + 1) for i, d in enumerate(groups[1]))
+                dec_val = sum(
+                    (string.digits + string.ascii_lowercase).index(d) * base ** -i
+                    for i, d in enumerate(groups[1], 1)
+                )
             return Value(val + dec_val, groups[2])
 
     if _PERCENT_PAT.match(expression):

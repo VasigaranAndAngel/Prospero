@@ -968,6 +968,7 @@ class TestOtherBaseNotations:
             ("b10.10", 2.5),
             ("b10.11", 2.75),
             ("b10.111", 2.875),
+            ("b.1", 0.5),
         ],
     )
     def test_binary_base_notation(self, expression: str, expected: int | float):
@@ -983,6 +984,7 @@ class TestOtherBaseNotations:
             ("o10.10", 8.125),
             ("o10.11", 8.140625),
             ("o10.111", 8.142578125),
+            ("o.1", 0.125),
         ],
     )
     def test_octal_base_notation(self, expression: str, expected: int | float):
@@ -998,6 +1000,8 @@ class TestOtherBaseNotations:
             ("x10.10", 16.0625),
             ("x10.11", 16.06640625),
             ("x10.111", 16.066650390625),
+            ("x10.a", 16.625),
+            ("x.a", 0.625),
         ],
     )
     def test_hex_base_notation(self, expression: str, expected: int | float):
