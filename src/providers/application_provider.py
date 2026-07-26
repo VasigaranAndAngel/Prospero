@@ -1,8 +1,8 @@
 import fnmatch
 import json
-import os
+import logging
 import subprocess
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, override
@@ -26,12 +26,15 @@ EXCLUDE_LIST: list[Path | str] = [
     "*/Desktop.ini",
 ]
 
+logger = logging.getLogger(__name__)
+
 
 def get_apps() -> list[dict[Literal["Name", "AppID"], str]]:
     command = "Get-StartApps | ConvertTo-Json"
     res = subprocess.run(
         ["powershell", "-NoProfile", "-Command", command], capture_output=True, text=True
     )
+    # TODO: should fallback to another method to get apps if this fails
     return json.loads(res.stdout)  # pyright: ignore[reportAny]
 
 
@@ -44,18 +47,23 @@ class AppResult(BaseResult):
     def __init__(
         self,
         result: str,
-        start: Path | str,
+        command: str | Sequence[str],
         score: int,
         highlighted_indexes: list[int],
         description: str | None,
     ) -> None:
         super().__init__(result, score, highlighted_indexes, description)
 
-        self.start: Path | str = start
+        self.command: str | Sequence[str] = command
+        "Command that will be sent to the subprocess.Popen."
 
     @override
     def execute(self, action: ExecutionActions) -> None:
-        os.startfile(self.start)
+        # os.startfile(self.start)
+        logger.debug(f"Launching: {self.command}")
+        _ = subprocess.Popen(
+            self.command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True
+        )
 
 
 class AppProvider(BaseProvider):
@@ -88,9 +96,9 @@ class AppProvider(BaseProvider):
             map(
                 lambda x: AppResult(
                     x.choice.text,
-                    _p
+                    f"start {_p.as_posix()}"
                     if isinstance((_p := x.choice.app_id_or_path), Path)
-                    else f"shell:appsFolder\\{_p}",
+                    else f"start shell:appsFolder\\{_p}",  # NOTE: Assuming the str is App ID
                     x.score,
                     x.positions,
                     str(x.choice.app_id_or_path),
