@@ -218,10 +218,10 @@ class MainWindow(QWidget):
             event.accept()
             return
         if self._shadow_focused_idx is not None:
-            self._result_boxes[self._shadow_focused_idx].keyReleaseEvent(event)
-
-        if event.key() == Qt.Key.Key_Return:
-            QTimer.singleShot(100, self.close)
+            res_box = self._result_boxes[self._shadow_focused_idx]
+            res_box.keyReleaseEvent(event)
+            if event.key() == Qt.Key.Key_Return and res_box.result.attributes.close_after_enter:
+                self._despawn()
         return super().keyReleaseEvent(event)
 
     def _resize(self) -> None:

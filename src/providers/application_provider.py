@@ -10,7 +10,7 @@ from typing import Literal, override
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from ._base_provider import BaseProvider
-from ._base_result import BaseResult, ExecutionActions
+from ._base_result import BaseResult, ExecutionActions, ResultAttributes
 
 ROAMING: Path = Path.home() / "AppData" / "Roaming"
 PROGRAM_DATA: Path = Path("C:/") / "ProgramData"
@@ -52,7 +52,8 @@ class AppResult(BaseResult):
         highlighted_indexes: list[int],
         description: str | None,
     ) -> None:
-        super().__init__(result, score, highlighted_indexes, description)
+        attrs = ResultAttributes(close_after_enter=True)
+        super().__init__(result, score, highlighted_indexes, description, attrs)
 
         self.command: str | Sequence[str] = command
         "Command that will be sent to the subprocess.Popen."
