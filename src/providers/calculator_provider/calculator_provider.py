@@ -1,6 +1,8 @@
 from collections.abc import Collection
 from typing import override
 
+from PySide6.QtGui import QGuiApplication
+
 from .._base_provider import BaseProvider
 from .._base_result import BaseResult, ExecutionActions
 from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
@@ -9,8 +11,7 @@ from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
 class CalcResult(BaseResult):
     @override
     def execute(self, action: ExecutionActions) -> None:
-        # TODO: copy the answer to clipboard
-        pass
+        QGuiApplication.clipboard().setText(self.result)
 
 
 class CalcProvider(BaseProvider):
