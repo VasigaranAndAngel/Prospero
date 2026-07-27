@@ -8,6 +8,40 @@ from providers.calculator_provider.nl_calc.arithmetic_split_method import (
 )
 
 
+class TestMistakes:
+    @pytest.mark.parametrize(
+        "expression, expected",
+        [
+            ("1", 1),
+            ("1.1", 1.1),
+            (".1", 0.1),
+            ("1.", 1),
+        ],
+    )
+    def test_numbers(self, expression: str, expected: int | float):
+        assert evaluator(expression) == expected
+
+    @pytest.mark.parametrize(
+        "expression, expected",
+        [
+            ("1 *", 1),
+            ("* 1", 1),
+        ]
+    )
+    def test_useless_operator_forgive(self, expression: str, expected: int | float):
+        assert evaluator(expression) == expected
+    
+    @pytest.mark.parametrize(
+        "expression, expected", 
+        [
+            ("+-1", -1),
+            ("1 + 1 - +", 2),
+            ("+ * 1", 1),
+        ]
+    )
+    def test_unwanted_operators(self, expression: str, expected: int | float):
+        assert evaluator(expression) == expected
+
 class TestBasicArithmetic:
     """Test basic arithmetic operations: +, -, *, /, %, **, ^"""
 

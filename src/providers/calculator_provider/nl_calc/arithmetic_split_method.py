@@ -8,7 +8,7 @@ from .value import NA_VALUE, Value
 
 _DECIMAL_FLOAT_PAT = re.compile(r"^((-)?\d+)?\.(-)?\d+$")
 _DECIMAL_INT_PAT = re.compile(r"^(-)?\d+$")
-_NUMBER_AND_UNIT_PAT = re.compile(r"^(-?\d*\.?\d+)\s?([a-zA-Z]*)$")
+_NUMBER_AND_UNIT_PAT = re.compile(r"^(?=.*\d.*)(-?\d*\.?\d*)\s?([a-zA-Z]*)$")
 _MULTI_PAT = re.compile(r"^(.+)(?<!\*)[\*xX](?!\*)(.+)$")
 _SCIENTIFIC_PAT = re.compile(r"^[+-]?\d+\.?\d*[eE][+-]?\d+$")
 _PERCENT_PAT = re.compile(r"^(\d+)?(\.)?\d%$")
@@ -154,7 +154,7 @@ def evaluator(expression: str) -> list[Value] | Value:
 
 # @_cache
 def _evaluator(expression: str) -> Value:
-    expression = expression.strip()
+    expression = expression.strip(x := "+*/^" + string.whitespace).rstrip(x + "-")
 
     if match := _NUMBER_AND_UNIT_PAT.match(expression):
         return Value(float((x := match.groups())[0]), x[1] or None)
@@ -169,7 +169,7 @@ def _evaluator(expression: str) -> Value:
             dec_val = 0
             if groups[1] is not None:
                 dec_val = sum(
-                    (string.digits + string.ascii_lowercase).index(d) * base ** -i
+                    (string.digits + string.ascii_lowercase).index(d) * base**-i
                     for i, d in enumerate(groups[1], 1)
                 )
             return Value(val + dec_val, groups[2])
