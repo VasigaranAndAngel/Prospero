@@ -97,10 +97,13 @@ def ui() -> None:
             super().__init__(parent, objectName=objectName)
 
             _ = self.trigger.connect(callback)
-            _ = keyboard.add_hotkey("ctrl+space", self._on_trigger, suppress=True)
+            _ = keyboard.add_hotkey("alt+space", self._on_trigger, suppress=True)
 
         def _on_trigger(self) -> None:
             self.trigger.emit()
+            keyboard.release("alt")
+            keyboard.release("left alt")
+            keyboard.release("right alt")
 
     app = QApplication(sys.argv)
     tray = QSystemTrayIcon()
