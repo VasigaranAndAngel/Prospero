@@ -68,8 +68,8 @@ class Command:
 _COMMANDS: dict[str, Command] = {
     "Quit": (x := Command("func", None, quit, "Quits the application")),
     "q": x,
-    "Power: Shutdown": Command("shell", "shutdown.exe /s", None, "Shuts down the computer"),
-    "Power: Restart": Command("shell", "shutdown.exe /r", None, "Restarts the computer"),
+    "Power: Shutdown": Command("shell", "shutdown.exe /s /t 0", None, "Shuts down the computer"),
+    "Power: Restart": Command("shell", "shutdown.exe /r /t 0", None, "Restarts the computer"),
     "Power: Hibernate": Command("shell", "shutdown.exe /h", None, "Hibernates the computer"),
     "Power: Sleep": Command("shell", "", None, "Puts the computer to sleep"),  # TODO: sleeping isn't easy
     "Power: Lock": Command("shell", "rundll32.exe user32.dll,LockWorkStation", None, "Locks the current user account"),
