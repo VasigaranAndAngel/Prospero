@@ -1,3 +1,4 @@
+import atexit
 import sys
 from typing import TYPE_CHECKING
 
@@ -74,36 +75,11 @@ def cli() -> None:
 
 
 def ui() -> None:
-    from collections.abc import Callable
-
-    import keyboard
-    from PySide6.QtCore import QObject, Signal
     from PySide6.QtGui import QAction
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+    from hotkey_listener import HotkeyListener
     from ui import MainWindow
-
-    class HotkeyHandler(QObject):
-        trigger: Signal = Signal()
-
-        def __init__(
-            self,
-            callback: Callable[[], None],
-            /,
-            parent: QObject | None = None,
-            *,
-            objectName: str | None = None,
-        ) -> None:
-            super().__init__(parent, objectName=objectName)
-
-            _ = self.trigger.connect(callback)
-            _ = keyboard.add_hotkey("alt+space", self._on_trigger, suppress=True)
-
-        def _on_trigger(self) -> None:
-            self.trigger.emit()
-            keyboard.release("alt")
-            keyboard.release("left alt")
-            keyboard.release("right alt")
 
     app = QApplication(sys.argv)
     tray = QSystemTrayIcon()
@@ -114,7 +90,10 @@ def ui() -> None:
     window = MainWindow()
     window.show()
 
-    _ = HotkeyHandler(window.show)
+    hk_listener = HotkeyListener()
+    _ = hk_listener.trigger.connect(window.show)
+    _ = atexit.register(hk_listener.stop)
+    hk_listener.start()
 
     _ = app.exec()
 

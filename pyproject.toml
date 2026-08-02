@@ -4,7 +4,7 @@ description = ""
 version = "0.0.1"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "keyboard>=0.13.5",
+    "pynput>=1.8.2",
     "pyqtgraph>=0.14.0",
     "pyside6>=6.11.1",
 ]
