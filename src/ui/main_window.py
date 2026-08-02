@@ -10,7 +10,7 @@ from PySide6.QtCore import (
     Qt,
     QTimer,
 )
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from providers import search
@@ -42,6 +42,7 @@ class MainWindow(QWidget):
 
         self._result_boxes: list[ResultBox] = []
         self._shadow_focused_idx: int | None = None
+        self._mouse_pressed: QPoint | None = None
 
         self._close: bool = False
         "Whether close the window when width anim finished."
@@ -74,14 +75,14 @@ class MainWindow(QWidget):
 
         _ = self.setProperty("_width", 1)
         self._width_anim: QPropertyAnimation = QPropertyAnimation(self, b"_width")
-        _ = self._width_anim.valueChanged.connect(self._resize)
+        _ = self._width_anim.valueChanged.connect(self._update_geo)
         _ = self._width_anim.finished.connect(self._on_width_anim_finished)
 
         _ = self.setProperty("_height", 400)
         self._height_anim: QPropertyAnimation = QPropertyAnimation(self, b"_height")
         self._height_anim.setDuration(350)
         self._height_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
-        _ = self._height_anim.valueChanged.connect(self._resize)
+        _ = self._height_anim.valueChanged.connect(self._update_geo)
 
     def _on_query_update(self, query: str) -> None:
         res = search(query)
@@ -224,7 +225,24 @@ class MainWindow(QWidget):
                 self._despawn()
         return super().keyReleaseEvent(event)
 
-    def _resize(self) -> None:
+    @override
+    def mousePressEvent(self, event: QMouseEvent, /) -> None:
+        self._mouse_pressed = event.pos()
+        return super().mousePressEvent(event)
+
+    @override
+    def mouseMoveEvent(self, event: QMouseEvent, /) -> None:
+        if self._mouse_pressed is not None:
+            self._pos += event.pos() - self._mouse_pressed
+            self._update_geo()
+        return super().mouseMoveEvent(event)
+
+    @override
+    def mouseReleaseEvent(self, event: QMouseEvent, /) -> None:
+        self._mouse_pressed = None
+        return super().mouseReleaseEvent(event)
+
+    def _update_geo(self) -> None:
         width = cast(int, self.property("_width"))
         height = cast(int, self.property("_height"))
         x = self._pos.x() - width // 2
