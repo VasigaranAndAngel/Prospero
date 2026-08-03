@@ -274,6 +274,7 @@ class MainWindow(QWidget):
         self.raise_()
         QTimer.singleShot(1, self.activateWindow)
         self._query_box.setFocus()
+        self._query_box.selectAll()
         self._width_anim.stop()
         self._width_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
         self._width_anim.setDuration(200)
