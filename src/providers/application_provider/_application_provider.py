@@ -12,20 +12,6 @@ from .._base_provider import BaseProvider
 from .._base_result import BaseResult, ExecutionActions, ResultAttributes
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
-ROAMING: Path = Path.home() / "AppData" / "Roaming"
-PROGRAM_DATA: Path = Path("C:/") / "ProgramData"
-APP_PATHS: list[Path] = []
-
-for i in {ROAMING, PROGRAM_DATA}:
-    APP_PATHS.append(i / "Microsoft" / "Windows" / "Start Menu")
-
-APP_PATHS.append(Path("C:/_My/Other/EnvDir"))
-
-EXCLUDE_LIST: list[Path | str] = [
-    "*/desktop.ini",
-    "*/Desktop.ini",
-]
-
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +63,6 @@ class AppResult(BaseResult):
 class AppProvider(BaseProvider):
     def __init__(self) -> None:
         super().__init__("Application Provider")
-        self.paths: list[Path] = []
         self.matcher: IncrementalMatcher[AppChoice] = IncrementalMatcher([], 5)
         self.app_details: AppDetailsFetcher = AppDetailsFetcher(self._update_choices)
         self.app_details.start()
