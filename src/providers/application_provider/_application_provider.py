@@ -1,16 +1,16 @@
-import fnmatch
-import json
 import logging
 import subprocess
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, override
+from typing import override
 
+from data_objects import IconLoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
-from ._base_provider import BaseProvider
-from ._base_result import BaseResult, ExecutionActions, ResultAttributes
+from .._base_provider import BaseProvider
+from .._base_result import BaseResult, ExecutionActions, ResultAttributes
+from ._get_app_details import AppDetail, AppDetailsFetcher
 
 ROAMING: Path = Path.home() / "AppData" / "Roaming"
 PROGRAM_DATA: Path = Path("C:/") / "ProgramData"
@@ -29,20 +29,17 @@ EXCLUDE_LIST: list[Path | str] = [
 logger = logging.getLogger(__name__)
 
 
-def get_apps() -> list[dict[Literal["Name", "AppID"], str]]:
-    command = "Get-StartApps | ConvertTo-Json"
-    res = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", command], capture_output=True, text=True
-    )
-    # TODO: should fallback to another method to get apps if this fails
-    return json.loads(res.stdout)  # pyright: ignore[reportAny]
-
-
 @dataclass
 class AppChoice(BaseChoice):
     app_id_or_path: str | Path
+    icon_load_method: IconLoadMethod | None
+
+    @override
+    def __hash__(self) -> int:
+        return hash(self.text + str(self.app_id_or_path))
 
 
+@dataclass
 class AppResult(BaseResult):
     def __init__(
         self,
@@ -51,9 +48,15 @@ class AppResult(BaseResult):
         score: int,
         highlighted_indexes: list[int],
         description: str | None,
+        icon_load_method: IconLoadMethod | None,
     ) -> None:
         attrs = ResultAttributes(close_after_enter=True)
-        super().__init__(result, score, highlighted_indexes, description, attrs)
+        if icon_load_method is None:
+            super().__init__(result, score, highlighted_indexes, description, attrs)
+        else:
+            super().__init__(
+                result, score, highlighted_indexes, description, attrs, icon_load_method
+            )
 
         self.command: str | Sequence[str] = command
         "Command that will be sent to the subprocess.Popen."
@@ -66,29 +69,23 @@ class AppResult(BaseResult):
             self.command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True
         )
 
+    @override
+    def __hash__(self) -> int:
+        return hash(self.result + str(self.command))
+
 
 class AppProvider(BaseProvider):
     def __init__(self) -> None:
         super().__init__("Application Provider")
         self.paths: list[Path] = []
         self.matcher: IncrementalMatcher[AppChoice] = IncrementalMatcher([], 5)
-        self._update_choices()
+        self.app_details: AppDetailsFetcher = AppDetailsFetcher(self._update_choices)
+        self.app_details.start()
 
-    def _update_choices(self) -> None:
-        def _is_excluded(file: dict[Literal["Name", "AppID"], str]) -> bool:
-            for i in EXCLUDE_LIST:
-                if isinstance(i, Path):
-                    raise NotImplementedError
-
-                if fnmatch.fnmatch(file["Name"], i):
-                    return False
-                if fnmatch.fnmatch(file["AppID"], i):
-                    return False
-            return True
-
-        filtered = filter(_is_excluded, get_apps())
-
-        self.matcher.update_choices([AppChoice(p["Name"], p["AppID"]) for p in filtered])
+    def _update_choices(self, details: list[AppDetail]) -> None:
+        self.matcher.update_choices(
+            [AppChoice(a.app_name or "", a.path or Path(), a.icon) for a in details]
+        )
 
     @override
     def search(self, query: str) -> Collection[AppResult]:
@@ -103,6 +100,7 @@ class AppProvider(BaseProvider):
                     x.score,
                     x.positions,
                     str(x.choice.app_id_or_path),
+                    x.choice.icon_load_method,
                 ),
                 res,
             )

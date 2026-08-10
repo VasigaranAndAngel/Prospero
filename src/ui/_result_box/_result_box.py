@@ -11,11 +11,12 @@ from PySide6.QtGui import (
     QPaintEvent,
     Qt,
 )
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from providers import BaseResult
 
 from ._base_result_box_widget import BaseResultBoxWidget
+from ._icon import Icon
 from ._layout import CustomVBoxLayout
 
 
@@ -26,11 +27,18 @@ class ResultBox(BaseResultBoxWidget):
 
         self.setFixedHeight(60)
 
-        self.setLayout(lay := CustomVBoxLayout(self))
-        lay.setContentsMargins(10, 10, 10, 10)
-        lay.setSpacing(0)
-        lay.addWidget(name_label := QLabel(text, self), alignment=Qt.AlignmentFlag.AlignVCenter)
-        lay.addWidget(info_label := QLabel("", self), alignment=Qt.AlignmentFlag.AlignTop)
+        self.setLayout(main_lay := QHBoxLayout())
+        main_lay.setSpacing(10)
+        main_lay.setContentsMargins(10, 10, 10, 10)
+
+        main_lay.addWidget(svg := Icon(result.icon_load_method, self))
+        svg.setFixedSize(40, 40)
+
+        main_lay.addLayout(txt_lay := CustomVBoxLayout())
+        txt_lay.setContentsMargins(0, 0, 0, 0)
+        txt_lay.setSpacing(0)
+        txt_lay.addWidget(name_label := QLabel(text, self), alignment=Qt.AlignmentFlag.AlignVCenter)
+        txt_lay.addWidget(info_label := QLabel("", self), alignment=Qt.AlignmentFlag.AlignTop)
         info_label.hide()
         self._description_widget: QLabel = info_label
         font = name_label.font()
