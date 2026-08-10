@@ -31,15 +31,25 @@ class ResultBox(BaseResultBoxWidget):
         main_lay.setSpacing(10)
         main_lay.setContentsMargins(10, 10, 10, 10)
 
-        main_lay.addWidget(svg := Icon(result.icon_load_method, self))
-        svg.setFixedSize(40, 40)
+        main_lay.addWidget(icon := Icon(result.icon_load_method, self))
+        icon.setFixedSize(40, 40)
 
         main_lay.addLayout(txt_lay := CustomVBoxLayout())
         txt_lay.setContentsMargins(0, 0, 0, 0)
         txt_lay.setSpacing(0)
+        txt_lay.duration = 500
         txt_lay.addWidget(name_label := QLabel(text, self), alignment=Qt.AlignmentFlag.AlignVCenter)
         txt_lay.addWidget(info_label := QLabel("", self), alignment=Qt.AlignmentFlag.AlignTop)
         info_label.hide()
+
+        # NOTE: since the CustomVBoxLayout detects and animates geometry of widgets, we can change
+        # the init values by altering the geometry.
+        init_x = main_lay.contentsMargins().left() + main_lay.spacing()
+        init_x += txt_lay.contentsMargins().left() + icon.width()
+        init_y = self.height() // 2
+        name_label.move(init_x, init_y - name_label.height() // 2)
+        info_label.move(init_x, init_y - info_label.height() // 2)
+
         self._description_widget: QLabel = info_label
         font = name_label.font()
         font.setPointSize(int(font.pointSize() * 1.3))

@@ -15,6 +15,8 @@ class CustomVBoxLayout(QVBoxLayout):
     _group: QAnimationGroup | None = None
     animate: bool = True
     newly_added_widgets: list[QWidget] = []
+    duration: int = 200
+    easing_curve: QEasingCurve | QEasingCurve.Type = QEasingCurve.Type.OutExpo
 
     @override
     def setGeometry(self, arg__1: QRect, /) -> None:
@@ -59,8 +61,8 @@ class CustomVBoxLayout(QVBoxLayout):
                 widget.setGeometry(target)
                 continue
             anim = QPropertyAnimation(widget, b"geometry", widget)
-            anim.setDuration(200)
-            anim.setEasingCurve(QEasingCurve.Type.OutExpo)
+            anim.setDuration(self.duration)
+            anim.setEasingCurve(self.easing_curve)
             anim.setStartValue(start)
             anim.setEndValue(target)
             group.addAnimation(anim)
