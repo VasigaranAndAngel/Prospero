@@ -2,6 +2,12 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import override
 
+from data_objects import IconLoadMethod
+
+
+def _get_default_icon() -> "IconLoadMethod":
+    return IconLoadMethod("default")
+
 
 class ExecutionActions(Enum):
     Enter = auto()
@@ -25,6 +31,7 @@ class BaseResult:
     highlighted_indexes: list[int]
     description: str | None = None
     attributes: ResultAttributes = field(default_factory=ResultAttributes)
+    icon_load_method: IconLoadMethod = field(default_factory=_get_default_icon)
 
     def highlighted(self, open_tag: str = "**", close_tag: str = "**") -> str:
         ih = set(self.highlighted_indexes)

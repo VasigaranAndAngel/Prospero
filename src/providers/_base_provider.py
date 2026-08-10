@@ -1,11 +1,13 @@
+from abc import ABC, abstractmethod
 from collections.abc import Collection
 
 from ._base_result import BaseResult
 
 
-class BaseProvider:
+class BaseProvider(ABC):
+    @abstractmethod
     def __init__(self, name: str) -> None:
         self.name: str = name
 
-    def search(self, query: str) -> Collection[BaseResult]:  # pyright: ignore[reportUnusedParameter]
-        raise NotImplementedError
+    @abstractmethod
+    def search(self, query: str) -> Collection[BaseResult]: ...
