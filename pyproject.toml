@@ -4,9 +4,12 @@ description = ""
 version = "0.0.1"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
     "pynput>=1.8.2",
     "pyqtgraph>=0.14.0",
     "pyside6>=6.11.1",
+    "pywin32>=312",
 ]
 
 [dependency-groups]
