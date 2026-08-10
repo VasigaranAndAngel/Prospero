@@ -3,7 +3,7 @@ import subprocess
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import Literal, override
 
 from data_objects import IconLoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppChoice(BaseChoice):
     app_id_or_path: str | Path
+    type: Literal["uwp", "desktop", "unknown"] | None
     icon_load_method: IconLoadMethod | None
 
     @override
@@ -69,7 +70,15 @@ class AppProvider(BaseProvider):
 
     def _update_choices(self, details: list[AppDetail]) -> None:
         self.matcher.update_choices(
-            [AppChoice(a.app_name or "", a.path or Path(), a.icon) for a in details]
+            [
+                AppChoice(
+                    a.app_name or "",
+                    a.path or Path() if a.type != "uwp" else a.app_id or "",
+                    a.type,
+                    a.icon,
+                )
+                for a in details
+            ]
         )
 
     @override
@@ -79,8 +88,8 @@ class AppProvider(BaseProvider):
             map(
                 lambda x: AppResult(
                     x.choice.text,
-                    f"start {_p.as_posix()}"
-                    if isinstance((_p := x.choice.app_id_or_path), Path)
+                    f'start "" "{_p.as_posix()}"'
+                    if isinstance((_p := x.choice.app_id_or_path), Path) and x.choice.type != "uwp"
                     else f"start shell:appsFolder\\{_p}",  # NOTE: Assuming the str is App ID
                     x.score,
                     x.positions,
