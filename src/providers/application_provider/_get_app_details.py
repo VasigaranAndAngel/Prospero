@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from data_objects import IconLoadMethod
+from data_objects import IconLoadMethod, LoadMethod
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ def _get_shortcut_targets() -> list[ShortcutTarget]:
                         break
                 if _con:
                     continue
-                icon = IconLoadMethod("win32api", _p)
+                icon = IconLoadMethod(LoadMethod.win32api, _p)
                 paths.append(ShortcutTarget(Name=_p.stem, LnkPath=_p, Icon=icon))
 
     return paths
@@ -159,7 +159,7 @@ def _build_full_app_list() -> list[AppDetail]:
             entry.path = Path(pkg.InstallLocation)
             logo_rel = pkg.Logo
             if pkg.InstallLocation and logo_rel:
-                entry.icon = IconLoadMethod("load_file", Path(pkg.InstallLocation) / logo_rel)
+                entry.icon = IconLoadMethod(LoadMethod.win32api_windows_app, app_id=app_id)
         elif name in shortcuts:
             # Desktop app via shortcut
             sc = shortcuts[name]

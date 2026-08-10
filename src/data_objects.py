@@ -6,13 +6,23 @@ Holds lightweight dataclasses and/or data related objects used by multiple modul
 can import them without triggering circular imports.
 
 Currently defines:
-  - IconLoadMethod: how an icon should be loaded (win32api, generic
-    win32api, from file, or default), with optional file path.
+    - IconLoadMethod: how an icon should be loaded (win32api, generic
+      win32api, from file, or default), with optional file path.
 """
 
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
-from typing import Literal, override
+from typing import override
+
+
+class LoadMethod(Enum):
+    win32api = auto()
+    win32api_generic = auto()
+    win32api_windows_app = auto()
+    load_file = auto()
+    default = auto()
+    loading = auto()
 
 
 @dataclass
@@ -23,9 +33,10 @@ class IconLoadMethod:
     This is related to ui._result_box._icon.py
     """
 
-    load_method: Literal["win32api", "win32api_generic", "load_file", "default", "loading"]
+    load_method: LoadMethod
     file_path: Path | None = None
+    app_id: str | None = None
 
     @override
     def __hash__(self) -> int:
-        return hash(f"{self.load_method}{self.file_path}")
+        return hash(f"{self.load_method}{self.file_path}{self.app_id}")

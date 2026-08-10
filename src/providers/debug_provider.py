@@ -2,7 +2,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from typing import override
 
-from data_objects import IconLoadMethod
+from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from ._base_provider import BaseProvider
@@ -24,10 +24,10 @@ class DebugProvider(BaseProvider):
 
         choices: list[DebugChoice] = []
         for i in range(10):
-            choices.append(DebugChoice(f"Debug: Loading Icon {i}", IconLoadMethod("loading")))
+            choices.append(DebugChoice(f"Debug: Loading Icon {i}", IconLoadMethod(LoadMethod.loading)))
 
-        choices.append(DebugChoice("Debug: Loading Icon", IconLoadMethod("loading")))
-        choices.append(DebugChoice("Debug: Default Icon", IconLoadMethod("default")))
+        choices.append(DebugChoice("Debug: Loading Icon", IconLoadMethod(LoadMethod.loading)))
+        choices.append(DebugChoice("Debug: Default Icon", IconLoadMethod(LoadMethod.loading)))
 
         self._matcher: IncrementalMatcher[DebugChoice] = IncrementalMatcher(choices)
 

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 import assets
 import helpers
-from data_objects import IconLoadMethod
+from data_objects import IconLoadMethod, LoadMethod
 from global_threading import THREAD_POOL
 
 
@@ -173,7 +173,7 @@ class Icon(QLabel):
         Icon._instances += 1
         self._instance_no: int = Icon._instances
 
-        self._load_method: IconLoadMethod = icon_load_method
+        self._i_load_method: IconLoadMethod = icon_load_method
 
         self._current_state: _IconState = _IconState.Loading
         # NOTE: fps is not dynamic. it will be fixed to primary monitors fps when creating instance.
@@ -195,22 +195,28 @@ class Icon(QLabel):
     def _load_icon(self) -> None:
         ic = None
         try:
-            lm, path = self._load_method.load_method, self._load_method.file_path
-            if path is None or lm in {"default", "loading"}:
+            lm, path = self._i_load_method.load_method, self._i_load_method.file_path
+            if (
+                lm is LoadMethod.win32api_windows_app
+                and (x := self._i_load_method.app_id) is not None
+            ):
+                ic = helpers.fetch_windows_app_icon(x)
+            elif path is None or lm in {LoadMethod.default, LoadMethod.loading}:
                 pass  # let ic to be None
-            elif lm == "win32api":
+            elif lm is LoadMethod.win32api:
                 ic = helpers.fetch_icon(path)
-            elif lm == "win32api_generic":
+            elif lm is LoadMethod.win32api_generic:
                 ic = helpers.fetch_icon(path, use_generic_type=True)
-            elif lm == "load_file":
+            elif lm is LoadMethod.load_file:
                 ic = QImage(path)
-        except Exception:
+        except Exception as e:
+            print(f"failed fetching: {e}")
             ic = None
         self._image_loaded.emit(ic)
 
     def _on_loaded(self, image: QImage | None) -> None:
         if image is None:
-            if self._load_method.load_method == "loading":
+            if self._i_load_method.load_method is LoadMethod.loading:
                 self._set_state(_IconState.Loading)
             else:
                 self._set_state(_IconState.Default)

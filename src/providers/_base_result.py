@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import override
 
-from data_objects import IconLoadMethod
+from data_objects import IconLoadMethod, LoadMethod
 
 
 def _get_default_icon() -> "IconLoadMethod":
-    return IconLoadMethod("default")
+    return IconLoadMethod(LoadMethod.default)
 
 
 class ExecutionActions(Enum):
