@@ -54,24 +54,21 @@ class Settings(BaseSettings):
         _ = CONFIG_FILE_PATH.write_text(tomli_w.dumps(self.model_dump()))
 
     def walk(self) -> Generator[tuple[BaseModel | Any, UIInfo | None, tuple[str, ...]], Any, None]:
-        return self._walk(self, [])
+        return self._walk(self)
 
     @classmethod
     def _walk(
-        cls, model: BaseModel, /, set_path: list[str]
+        cls, model: BaseModel, /, path: tuple[str, ...] = ()
     ) -> Generator[tuple[BaseModel | Any, UIInfo | None, tuple[str, ...]], Any, None]:
         for name, ins in model:
-            set_path.append(name)
-            set_path_tuple = tuple(set_path)
-            field_info = model.__class__.model_fields[name]
+            field_path = path + (name,)
+            field_info = type(model).model_fields[name]
             ui_info = next((x for x in field_info.metadata if isinstance(x, UIInfo)), None)
 
-            yield ins, ui_info, set_path_tuple
+            yield ins, ui_info, field_path
 
             if isinstance(ins, BaseModel):
-                for i in cls._walk(ins, set_path):
-                    yield i
-            _ = set_path.pop()
+                yield from cls._walk(ins, field_path)
 
 
 settings = Settings()
