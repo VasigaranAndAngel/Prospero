@@ -12,7 +12,6 @@ from pydantic_settings import (
 )
 
 from constants import APPLICATION_NAME
-from settings._ui_info import UIInfo
 
 from ._ui_info import Category, UIInfo
 from .categories import WindowGeometryCategory
@@ -25,7 +24,7 @@ class BaseCategory(BaseModel):
     # depends: "BaseCategory | BaseSetting | None" = None
 
 
-class Settings(BaseSettings):
+class Configs(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         toml_file=CONFIG_FILE_PATH,
         env_prefix=APPLICATION_NAME.upper() + "_",
@@ -71,4 +70,4 @@ class Settings(BaseSettings):
                 yield from cls._walk(ins, field_path)
 
 
-settings = Settings()
+CONFIGS = Configs()
