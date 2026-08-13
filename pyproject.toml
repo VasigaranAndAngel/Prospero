@@ -10,6 +10,7 @@ dependencies = [
     "pyqtgraph>=0.14.0",
     "pyside6>=6.11.1",
     "pywin32>=312",
+    "tomli-w>=1.2.0",
 ]
 
 [dependency-groups]
