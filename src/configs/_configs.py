@@ -19,11 +19,6 @@ from .categories import WindowGeometryCategory
 CONFIG_FILE_PATH = Path.home() / ".config" / (APPLICATION_NAME.title() + ".toml")
 
 
-class BaseCategory(BaseModel):
-    pass
-    # depends: "BaseCategory | BaseSetting | None" = None
-
-
 class Configs(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         toml_file=CONFIG_FILE_PATH,
@@ -31,7 +26,7 @@ class Configs(BaseSettings):
         env_nested_delimiter="__",
         cli_parse_args=True,
     )
-    WindowGeometry: Annotated[WindowGeometryCategory, Category()] = Field(
+    window_geometry: Annotated[WindowGeometryCategory, Category()] = Field(
         default_factory=WindowGeometryCategory,
         title="Window Geometry",
         description="Configurations related to geometry of the window.",
@@ -70,4 +65,4 @@ class Configs(BaseSettings):
                 yield from cls._walk(ins, field_path)
 
 
-CONFIGS = Configs()
+CONFIGS = conf = Configs()

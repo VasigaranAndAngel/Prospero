@@ -1,3 +1,3 @@
-from .shared import Point
+from .shared import Point, PointF
 
-__all__ = ["Point"]
+__all__ = ["Point", "PointF"]

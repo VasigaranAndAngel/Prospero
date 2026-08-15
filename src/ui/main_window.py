@@ -11,8 +11,9 @@ from PySide6.QtCore import (
     QTimer,
 )
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
+from configs import conf
 from providers import search
 from providers._base_result import BaseResult
 
@@ -83,6 +84,9 @@ class MainWindow(QWidget):
         self._height_anim.setDuration(350)
         self._height_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
         _ = self._height_anim.valueChanged.connect(self._update_geo)
+
+        self._connect_config_hooks()
+        self._update_pos(None)  # for update the position from config for the first time
 
     def _on_query_update(self, query: str) -> None:
         res = search(query)
@@ -196,6 +200,20 @@ class MainWindow(QWidget):
         self._shadow_focused_idx = idx
         self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
 
+    def _connect_config_hooks(self) -> None:
+        conf.window_geometry.position.rel_value.subscribe(self._update_pos)
+
+    # region config updates
+    def _update_pos(self, _) -> None:
+        s = QApplication.primaryScreen().size()
+        new_pos = QPoint(*conf.window_geometry.position.get_pos(s.width(), s.height()))
+
+        if self._pos != new_pos:
+            self._pos = new_pos
+            self._update_geo()
+
+    # endregion
+
     @override
     def keyPressEvent(self, event: QKeyEvent, /) -> None:
         if event.key() in {Qt.Key.Key_Up, Qt.Key.Key_Backtab}:
@@ -234,12 +252,18 @@ class MainWindow(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent, /) -> None:
         if self._mouse_pressed is not None:
             self._pos += event.pos() - self._mouse_pressed
+            if conf.window_geometry.position.remember.value:
+                s = QApplication.primaryScreen().size()
+                p = self._pos
+                conf.window_geometry.position.set_pos(s.width(), s.height(), p.x(), p.y())
             self._update_geo()
         return super().mouseMoveEvent(event)
 
     @override
     def mouseReleaseEvent(self, event: QMouseEvent, /) -> None:
         self._mouse_pressed = None
+        if conf.window_geometry.position.remember.value:
+            conf.save_configs()
         return super().mouseReleaseEvent(event)
 
     def _update_geo(self) -> None:

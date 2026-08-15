@@ -1,5 +1,4 @@
-from ._configs import CONFIGS
+from ._configs import CONFIGS, conf
+from ._ui_info import UIInfo
 
-conf = CONFIGS
-
-__all__ = ["CONFIGS", "conf"]
+__all__ = ["CONFIGS", "conf", "UIInfo"]
