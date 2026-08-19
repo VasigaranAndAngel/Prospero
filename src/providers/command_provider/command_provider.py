@@ -8,6 +8,7 @@ from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
 from .._base_result import BaseResult, ExecutionActions
+from ._shutdown import shutdown_respect_hybrid
 
 logger = logging.getLogger(__name__)
 
