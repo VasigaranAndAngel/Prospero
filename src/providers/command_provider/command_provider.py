@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Literal, overload, override
 
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
-from ._base_provider import BaseProvider
-from ._base_result import BaseResult, ExecutionActions
+from .._base_provider import BaseProvider
+from .._base_result import BaseResult, ExecutionActions
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,11 @@ class Command:
 
         @overload
         def __init__(
-            self, command_type: Literal["shell"], shell_command: str, func: None, description: str
+            self,
+            command_type: Literal["shell", "func"],
+            shell_command: str,
+            func: None,
+            description: str,
         ) -> None: ...
 
         @overload
@@ -54,7 +58,7 @@ class Command:
                 stdout=subprocess.DEVNULL,  # mac and linux
                 stderr=subprocess.DEVNULL,  # mac and linux
             )
-            logger.debug(res.stderr)
+            logger.debug(res.stderr)  # TODO: remove?
 
     @override
     def __str__(self) -> str:
@@ -68,11 +72,15 @@ class Command:
 _COMMANDS: dict[str, Command] = {
     "Quit": (x := Command("func", None, quit, "Quits the application")),
     "q": x,
-    "Power: Shutdown": Command("shell", "shutdown.exe /s /t 0", None, "Shuts down the computer"),
+    "Power: Shutdown": Command("func", None, shutdown_respect_hybrid, "Shuts down the computer"),
     "Power: Restart": Command("shell", "shutdown.exe /r /t 0", None, "Restarts the computer"),
     "Power: Hibernate": Command("shell", "shutdown.exe /h", None, "Hibernates the computer"),
-    "Power: Sleep": Command("shell", "", None, "Puts the computer to sleep"),  # TODO: sleeping isn't easy
-    "Power: Lock": Command("shell", "rundll32.exe user32.dll,LockWorkStation", None, "Locks the current user account"),
+    "Power: Sleep": Command(
+        "shell", "", None, "Puts the computer to sleep"
+    ),  # TODO: sleeping isn't easy
+    "Power: Lock": Command(
+        "shell", "rundll32.exe user32.dll,LockWorkStation", None, "Locks the current user account"
+    ),
 }
 
 

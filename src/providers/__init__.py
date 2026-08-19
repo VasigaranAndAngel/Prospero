@@ -3,7 +3,7 @@ from collections.abc import Collection
 from ._base_result import BaseResult, ExecutionActions
 from .application_provider import AppProvider
 from .calculator_provider import CalcProvider
-from .command_providers import CommandProvider
+from .command_provider import CommandProvider
 from .debug_provider import DebugProvider
 
 PROVIDERS = [AppProvider, CalcProvider, CommandProvider, DebugProvider]
