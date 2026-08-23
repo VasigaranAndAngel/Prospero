@@ -11,13 +11,15 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, model_serializer, model
 
 type _ImmutablePrimitive = tuple[_ImmutablePrimitive, ...]
 # ImmutablePrimitive = TypeVar("ImmutablePrimitive", str, int, float, bool, None, _ImmutablePrimitive)
-ImmutablePrimitive = TypeVar("ImmutablePrimitive")
+ImmutablePrimitive = TypeVar(
+    "ImmutablePrimitive"
+)  # TODO: should only support convertible to json/toml and immutable
 
 
 # region Observer
 @dataclass(frozen=True)
 class ChangeEvent:
-    path: str  # e.g. "Position.type" — relative to the subscriber
+    path: str  # e.g. "window_geometry.position.type"
     value: object
     "The new value"
     source: "ConfigValue"  # pyright: ignore[reportMissingTypeArgument]
@@ -28,6 +30,7 @@ class Observable(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(validate_assignment=True)
 
     _field_name: str = PrivateAttr(default="")
+    _parent: "Observable | None" = PrivateAttr(default=None)
     _change_hooks: list[Callable[[ChangeEvent], None]] = PrivateAttr(default_factory=list)
 
     def subscribe(self, cb: Callable[[ChangeEvent], None]) -> None:
@@ -36,33 +39,23 @@ class Observable(BaseModel):
     def _emit(self, event: ChangeEvent) -> None:
         for cb in self._change_hooks:
             cb(event)
+        if self._parent is not None:
+            self._parent._emit(event)
+
+    def get_path(self) -> str:
+        if self._parent is not None:
+            return self._parent.get_path() + "." + self._field_name
+        return self._field_name
 
 
 class Container(Observable):
-    """Wires child change events to bubble upward."""
-
     @override
     def model_post_init(self, __context: object) -> None:
         for field_name in type(self).model_fields:
-            self._wire_child(field_name, getattr(self, field_name))  # pyright: ignore[reportAny]
-
-    def _wire_child(self, field_name: str, child: object) -> None:
-        if isinstance(child, Observable):
-            child._field_name = field_name
-            child.subscribe(self._bubbler(field_name))
-
-    def _bubbler(self, field_name: str) -> Callable[[ChangeEvent], None]:
-        def _bubble(event: ChangeEvent) -> None:
-            path = f"{field_name}.{event.path}" if event.path else field_name
-            self._emit(ChangeEvent(path=path, value=event.value, source=event.source))
-
-        return _bubble
-
-    @override
-    def __setattr__(self, name: str, val: object) -> None:
-        super().__setattr__(name, val)
-        if name in type(self).model_fields:
-            self._wire_child(name, val)  # re-wire on whole-field reassignment
+            child = getattr(self, field_name)  # pyright: ignore[reportAny]
+            if isinstance(child, Observable):
+                child._field_name = field_name
+                child._parent = self
 
 
 # endregion
@@ -87,7 +80,7 @@ class ConfigValue(Observable, Generic[ImmutablePrimitive]):
     def __setattr__(self, name: str, value: object, /) -> None:
         super().__setattr__(name, value)
         if name == "value":
-            self._emit(ChangeEvent(path=self._field_name, value=value, source=self))
+            self._emit(ChangeEvent(path=self.get_path(), value=value, source=self))
 
     def add_change_hook(self, func: Callable[[object], None]) -> None:
         self._change_hooks.append(func)

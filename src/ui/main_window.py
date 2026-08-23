@@ -13,7 +13,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
-from configs import conf
+from configs import ChangeEvent, conf
 from providers import search
 from providers._base_result import BaseResult
 
@@ -86,7 +86,7 @@ class MainWindow(QWidget):
         _ = self._height_anim.valueChanged.connect(self._update_geo)
 
         self._connect_config_hooks()
-        self._update_pos(None)  # for update the position from config for the first time
+        self._update_pos()  # for update the position from config for the first time
 
     def _on_query_update(self, query: str) -> None:
         res = search(query)
@@ -201,10 +201,10 @@ class MainWindow(QWidget):
         self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
 
     def _connect_config_hooks(self) -> None:
-        conf.window_geometry.position.rel_value.subscribe(self._update_pos)
+        conf.window_geometry.position.subscribe(self._update_pos)
 
     # region config updates
-    def _update_pos(self, _) -> None:
+    def _update_pos(self, _: ChangeEvent | None = None) -> None:
         s = QApplication.primaryScreen().size()
         new_pos = QPoint(*conf.window_geometry.position.get_pos(s.width(), s.height()))
 
