@@ -1,7 +1,8 @@
 import logging
 import subprocess
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Literal, override
 
@@ -10,6 +11,7 @@ from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
 from .._base_result import BaseResult, ExecutionActions, ResultAttributes
+from .._loading_request import LoadingRequest
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
 logger = logging.getLogger(__name__)
@@ -64,11 +66,21 @@ class AppResult(BaseResult):
 class AppProvider(BaseProvider):
     def __init__(self) -> None:
         super().__init__("Application Provider")
+        self._fetching_app_details: bool = True
+        "Whether the app details are being fetched or not."
+        self._call_after_fetching: Callable[[], None] | None = None
+        "A callback that will be called after the details are fetched."
+        self._loading_request: LoadingRequest = LoadingRequest(score=100)
+        "The loading request that will be given to UI from this provider."
+        self._loading_request_sent: bool = False
+        "Whether the LoadingRequest instance is sent to UI or not."
+
         self.matcher: IncrementalMatcher[AppChoice] = IncrementalMatcher([], 5)
         self.app_details: AppDetailsFetcher = AppDetailsFetcher(self._update_choices)
         self.app_details.start()
 
     def _update_choices(self, details: list[AppDetail]) -> None:
+        self._fetching_app_details = False
         self.matcher.update_choices(
             [
                 AppChoice(
@@ -80,6 +92,8 @@ class AppProvider(BaseProvider):
                 for a in details
             ]
         )
+        if self._call_after_fetching is not None:
+            self._call_after_fetching()
 
     @override
     def search(self, query: str) -> Collection[AppResult]:
@@ -99,3 +113,26 @@ class AppProvider(BaseProvider):
                 res,
             )
         )
+
+    @override
+    def search_async(
+        self, query: str, callback: Callable[[Collection[BaseResult] | LoadingRequest], None]
+    ) -> None:
+        # NOTE: This method will be called on each query update. self._call_after_fetching will
+        # contain the partial which has the latest query.
+        if self._fetching_app_details:
+            if not self._loading_request_sent:
+                # Send the loading request instance to the UI. (only if not sent already)
+                callback(self._loading_request)
+                self._loading_request_sent = True
+
+            # Using a wrapper that will be called as soon as search is completed to remove loading request
+            def _wrapper(arg: Collection[BaseResult] | LoadingRequest) -> None:
+                "To remove LoadingRequest before giving results."
+                self._loading_request.remove()
+                self._loading_request_sent = False
+                callback(arg)
+
+            self._call_after_fetching = partial(super().search_async, query, _wrapper)
+        else:
+            return super().search_async(query, callback)

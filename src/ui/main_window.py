@@ -1,20 +1,14 @@
 import ctypes
 import logging
+from collections.abc import Collection
 from typing import Literal, cast, override
 
-from PySide6.QtCore import (
-    QEasingCurve,
-    QEvent,
-    QPoint,
-    QPropertyAnimation,
-    Qt,
-    QTimer,
-)
+from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from configs import ChangeEvent, conf
-from providers import search
+from providers import LoadingRequest, search_async
 from providers._base_result import BaseResult
 
 from ._query_box import QueryBox
@@ -28,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QWidget):
+    _result_update: Signal = Signal()
+    "To update the results from the main thread."
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -44,6 +41,7 @@ class MainWindow(QWidget):
         self._result_boxes: list[ResultBox] = []
         self._shadow_focused_idx: int | None = None
         self._mouse_pressed: QPoint | None = None
+        self._loading_requests: list[LoadingRequest] = []
 
         self._close: bool = False
         "Whether close the window when width anim finished."
@@ -87,14 +85,29 @@ class MainWindow(QWidget):
 
         self._connect_config_hooks()
         self._update_pos()  # for update the position from config for the first time
+        _ = self._result_update.connect(self._update_results_box)
 
     def _on_query_update(self, query: str) -> None:
-        res = search(query)
-        self._current_results = tuple(
-            sorted(filter(lambda x: x.score > 0, res), key=lambda x: -x.score)
+        self._current_results = tuple()
+        search_async(query, self._update_results)
+
+    def _update_results(self, res: Collection[BaseResult] | LoadingRequest) -> None:
+        if isinstance(res, LoadingRequest):
+            self._loading_requests.append(res)
+            res.add_to_remove_hooks(self._remove_loading_request)
+            self._update_loading_state()
+            return
+
+        new_results = tuple(
+            sorted(
+                filter(lambda x: x.score > 0, self._current_results + tuple(res)),
+                key=lambda x: -x.score,
+            )
         )
-        print("\r\033[K" + query + f"; Res: {len(res)}", end="", flush=True)  # TODO: remove
-        self._update_results_box()
+        if not self._current_results or self._current_results != new_results:
+            # Only update if results are empty or new results has changes.
+            self._current_results = new_results
+            self._result_update.emit()
 
     def _update_results_box(self) -> None:
         self._result_boxes = []
@@ -203,9 +216,18 @@ class MainWindow(QWidget):
     def _connect_config_hooks(self) -> None:
         conf.window_geometry.position.subscribe(self._update_pos)
 
+    def _remove_loading_request(self, req: LoadingRequest) -> None:
+        if req in self._loading_requests:
+            self._loading_requests.remove(req)
+            req.remove_from_remove_hooks(self._remove_loading_request)
+        self._update_loading_state()
+
+    def _update_loading_state(self) -> None:
+        self._query_box.set_loading_state(len(self._loading_requests) > 0)
+
     # region config updates
     def _update_pos(self, _: ChangeEvent | None = None) -> None:
-        s = QApplication.primaryScreen().size()
+        s = self.screen().size()
         new_pos = QPoint(*conf.window_geometry.position.get_pos(s.width(), s.height()))
 
         if self._pos != new_pos:
@@ -253,7 +275,7 @@ class MainWindow(QWidget):
         if self._mouse_pressed is not None:
             self._pos += event.pos() - self._mouse_pressed
             if conf.window_geometry.position.remember.value:
-                s = QApplication.primaryScreen().size()
+                s = self.screen().size()
                 p = self._pos
                 conf.window_geometry.position.set_pos(s.width(), s.height(), p.x(), p.y())
             self._update_geo()
