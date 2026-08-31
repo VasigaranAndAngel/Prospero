@@ -7,7 +7,8 @@ from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt,
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from configs import ChangeEvent, conf
+from config_models import ChangeEvent
+from configs import conf
 from providers import LoadingRequest, search_async
 from providers._base_result import BaseResult
 

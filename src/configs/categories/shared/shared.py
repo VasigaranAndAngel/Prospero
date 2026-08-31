@@ -2,7 +2,8 @@ from typing import Annotated
 
 from pydantic import Field
 
-from ..._config_value import ConfigValue
+from config_models import ConfigValue
+
 from ..._ui_info import SpinBox
 from .._base_category import BaseCategory
 

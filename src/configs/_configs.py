@@ -11,9 +11,9 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
+from config_models import ChangeEvent, Observable
 from constants import APPLICATION_NAME
 
-from ._config_value import ChangeEvent, Observable
 from ._ui_info import Category, UIInfo
 from .categories import WindowGeometryCategory
 

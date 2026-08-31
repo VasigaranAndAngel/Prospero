@@ -2,7 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from .._config_value import ConfigValue
+from config_models import ConfigValue
+
 from .._ui_info import Category, CheckBox, ComboBox
 from ._base_category import BaseCategory
 from .shared import Point, PointF
