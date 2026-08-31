@@ -2,10 +2,9 @@ from typing import Annotated
 
 from pydantic import Field
 
-from config_models import ConfigValue
+from config_models import BaseCategory, ConfigValue
 
 from ..._ui_info import SpinBox
-from .._base_category import BaseCategory
 
 
 class Point(BaseCategory):

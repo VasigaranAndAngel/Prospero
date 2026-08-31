@@ -1,4 +1,4 @@
-from config_models import Container
+from ._config_value import Container
 
 
 class BaseCategory(Container):
