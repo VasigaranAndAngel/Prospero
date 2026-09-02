@@ -3,9 +3,10 @@ Contains the base class of values of configs. This is for, keep track of what's 
 trigger hooks when the value is updated.
 """
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar, Generic, TypeVar, override
+from typing import ClassVar, Generic, TypeVar, cast, override
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, model_serializer, model_validator
 
@@ -31,14 +32,32 @@ class Observable(BaseModel):
 
     _field_name: str = PrivateAttr(default="")
     _parent: "Observable | None" = PrivateAttr(default=None)
-    _change_hooks: list[Callable[[ChangeEvent], None]] = PrivateAttr(default_factory=list)
+    _change_hooks: list[Callable[[], None] | Callable[[ChangeEvent], None]] = PrivateAttr(
+        default_factory=list
+    )
 
-    def subscribe(self, cb: Callable[[ChangeEvent], None]) -> None:
+    def subscribe(self, cb: Callable[[], None] | Callable[[ChangeEvent], None]) -> None:
         self._change_hooks.append(cb)
 
     def _emit(self, event: ChangeEvent) -> None:
+        """Calls all subscribed callables with ChangeEvent as parameter.
+
+        Calls with ChangeEvent as parameter if the callable accepts at least 1 arg and the first
+        arg is type annotated as ChangeEvent. Otherwise just calls the callback without any
+        parameters.
+
+        Args:
+            event (ChangeEvent): Instance of ChangeEvent which contains few details related to the
+                change.
+        """
         for cb in self._change_hooks:
-            cb(event)
+            spec = inspect.getfullargspec(cb)
+            if len(spec.args) > 0 and spec.annotations[spec.args[0]][1] == ChangeEvent:
+                # if len of args is at least 1 and first arg's type annotation is ChangEvent
+                cast(Callable[[ChangeEvent], None], cb)(event)
+            else:
+                cast(Callable[[], None], cb)()
+
         if self._parent is not None:
             self._parent._emit(event)
 
