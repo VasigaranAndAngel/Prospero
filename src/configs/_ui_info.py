@@ -47,3 +47,13 @@ class ColorEdit(UIInfo):
 @dataclass(frozen=True)
 class Category(UIInfo):
     compact: bool = False
+
+
+@dataclass(frozen=True)
+class FilePath(UIInfo):
+    pass
+
+
+@dataclass(frozen=True)
+class DirPath(UIInfo):
+    pass

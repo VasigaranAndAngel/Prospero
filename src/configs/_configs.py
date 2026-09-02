@@ -15,7 +15,7 @@ from config_models import ChangeEvent, Observable
 from constants import APPLICATION_NAME
 
 from ._ui_info import Category, UIInfo
-from .categories import WindowGeometryCategory
+from .categories import AppearanceCategory, GeneralCategory, WindowGeometryCategory
 
 CONFIG_FILE_PATH = Path.home() / ".config" / (APPLICATION_NAME.title() + ".toml")
 
@@ -29,10 +29,20 @@ class Configs(BaseSettings):
         env_nested_delimiter="__",
         cli_parse_args=True,
     )
+    general: Annotated[GeneralCategory, Category()] = Field(
+        default_factory=GeneralCategory,
+        title="General",
+        description="General Configurations.",
+    )
     window_geometry: Annotated[WindowGeometryCategory, Category()] = Field(
         default_factory=WindowGeometryCategory,
         title="Window Geometry",
         description="Configurations related to geometry of the window.",
+    )
+    appearance: Annotated[AppearanceCategory, Category()] = Field(
+        default_factory=AppearanceCategory,
+        title="Appearance",
+        description="Configurations related to Appearance.",
     )
 
     # Since BaseSettings doesn't allow multiple inheritance,
