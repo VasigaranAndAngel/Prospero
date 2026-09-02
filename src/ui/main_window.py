@@ -4,22 +4,134 @@ from collections.abc import Collection
 from typing import Literal, cast, override
 
 from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QKeyEvent, QMouseEvent
+from PySide6.QtGui import (
+    QColor,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QResizeEvent,
+)
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
 from providers import LoadingRequest, search_async
 from providers._base_result import BaseResult
+from theme import theme
 
 from ._query_box import QueryBox
 from ._result_box import ResultBox
 from ._result_box._layout import CustomVBoxLayout
 from ._results_box import ResultsBox
 
-SCALE = (600, 400)
-
 logger = logging.getLogger(__name__)
+
+
+class CornerMaskOverlay(QWidget):
+    """To cut corner radius shape from main window.
+
+    This widget is just laid over the main window contents. This will draw transparent corners
+    with composition mode of the painter set to source. which makes the corner curves.
+    """
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self._radius: float | tuple[float, float, float, float]
+        self._update_radius()
+        theme.main_window.corner_radius.subscribe(self._update_radius)
+
+    def _update_radius(self) -> None:
+        cr = theme.main_window.corner_radius
+        split = cr.split_values.value
+        if split:
+            self._radius = (
+                cr.top_left.value,
+                cr.top_right.value,
+                cr.bottom_right.value,
+                cr.bottom_left.value,
+            )
+        else:
+            self._radius = cr.single_value.value
+        self.repaint()
+
+    @override
+    def paintEvent(self, event: QPaintEvent, /) -> None:
+        if isinstance(self._radius, tuple):
+            a, b, c, d = self._radius
+            draw = max(self._radius) > 0
+        else:
+            a = b = c = d = self._radius
+            draw = self._radius > 0
+
+        if draw:
+            rect = self.rect()
+            top_left_radius = a
+            top_right_radius = b
+            bottom_right_radius = c
+            bottom_left_radius = d
+
+            rounded_path = QPainterPath()
+            "The path to be painted"
+
+            # Start from top-left, after the corner arc
+            rounded_path.moveTo(rect.left() + top_left_radius, rect.top())
+
+            # Top edge & top-right corner
+            rounded_path.lineTo(rect.right() - top_right_radius, rect.top())
+            rounded_path.arcTo(
+                rect.right() - (2 * top_right_radius),
+                rect.top(),
+                2 * top_right_radius,
+                2 * top_right_radius,
+                90,
+                -90,
+            )
+
+            # Right edge & bottom-right corner
+            rounded_path.lineTo(rect.right(), rect.bottom() - bottom_right_radius)
+            rounded_path.arcTo(
+                rect.right() - (2 * bottom_right_radius),
+                rect.bottom() - (2 * bottom_right_radius),
+                2 * bottom_right_radius,
+                2 * bottom_right_radius,
+                0,
+                -90,
+            )
+
+            # Bottom edge & bottom-left corner (radius 0 means sharp line)
+            rounded_path.lineTo(rect.left() + bottom_left_radius, rect.bottom())
+            if bottom_left_radius > 0:
+                rounded_path.arcTo(
+                    rect.left(),
+                    rect.bottom() - (2 * bottom_left_radius),
+                    2 * bottom_left_radius,
+                    2 * bottom_left_radius,
+                    270,
+                    -90,
+                )
+
+            # Left edge & top-left corner
+            rounded_path.lineTo(rect.left(), rect.top() + top_left_radius)
+            rounded_path.arcTo(
+                rect.left(), rect.top(), 2 * top_left_radius, 2 * top_left_radius, 180, -90
+            )
+
+            rounded_path.closeSubpath()
+
+            path = QPainterPath()
+            "Path to be removed (corners)"
+            path.addRect(rect)
+            corners_path = path.subtracted(rounded_path)  # everything OUTSIDE the rounded rect
+
+            with QPainter(self) as painter:
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+                painter.fillPath(corners_path, Qt.GlobalColor.transparent)
 
 
 class MainWindow(QWidget):
@@ -38,6 +150,7 @@ class MainWindow(QWidget):
 
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setAttribute(Qt.WidgetAttribute.WA_QuitOnClose, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self._result_boxes: list[ResultBox] = []
         self._shadow_focused_idx: int | None = None
@@ -50,6 +163,9 @@ class MainWindow(QWidget):
         "All the results from current query."
         self._pos: QPoint = QPoint((x := self.screen().size()).width() // 2, x.height() // 3)
         "The position of the widget. (x points to middle of widget x)"
+
+        self._corner_mask: CornerMaskOverlay = CornerMaskOverlay(self)
+        self._corner_mask.show()
 
         self._query_box: QueryBox = QueryBox(self)
         _ = self._query_box.textChanged.connect(self._on_query_update)
@@ -72,13 +188,14 @@ class MainWindow(QWidget):
         layout.addWidget(self._results_box)
 
         self.setLayout(layout)
+        self._corner_mask.raise_()
 
-        _ = self.setProperty("_width", 1)
+        _ = self.setProperty("_width", 0)
         self._width_anim: QPropertyAnimation = QPropertyAnimation(self, b"_width")
         _ = self._width_anim.valueChanged.connect(self._update_geo)
         _ = self._width_anim.finished.connect(self._on_width_anim_finished)
 
-        _ = self.setProperty("_height", 400)
+        _ = self.setProperty("_height", 0)
         self._height_anim: QPropertyAnimation = QPropertyAnimation(self, b"_height")
         self._height_anim.setDuration(350)
         self._height_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
@@ -114,10 +231,14 @@ class MainWindow(QWidget):
         self._result_boxes = []
         widget = self._results_box.widget()
         if widget is None:
-            return
+            raise Exception(
+                f"Not able to update results box since self._results_box.widget() is None unexpectedly."
+            )
         layout = cast(CustomVBoxLayout | None, widget.layout())
         if layout is None:
-            return
+            raise Exception(
+                f"Not able to update results box since self._results_box.widget().layout() is None unexpectedly."
+            )
 
         # Preserve same hash results
         preserved: dict[int, ResultBox] = {}
@@ -158,10 +279,7 @@ class MainWindow(QWidget):
 
         # Set window's size
         widget.adjustSize()
-        height = widget.height() + self._query_box.height()
-        self._height_anim.stop()
-        self._height_anim.setEndValue(height)
-        self._height_anim.start()
+        self._update_size()
 
         # Remove old shadow focus
         for res_box in self._result_boxes:
@@ -178,6 +296,9 @@ class MainWindow(QWidget):
             self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
         else:
             self._shadow_focused_idx = None
+
+        # raise the mask widget to the top
+        self._corner_mask.raise_()
 
     def _on_width_anim_finished(self) -> None:
         if self._close:
@@ -216,6 +337,7 @@ class MainWindow(QWidget):
 
     def _connect_config_hooks(self) -> None:
         conf.window_geometry.position.subscribe(self._update_pos)
+        conf.window_geometry.size.subscribe(self._update_size)
 
     def _remove_loading_request(self, req: LoadingRequest) -> None:
         if req in self._loading_requests:
@@ -313,6 +435,27 @@ class MainWindow(QWidget):
         finally:
             user32.AttachThreadInput(fg_thread, current_thread, False)
 
+    def _update_size(self) -> None:
+        "Updates the size of window according to configs and spawn state with animation"
+        src_s = self.screen().size()
+        size = conf.window_geometry.size.get_size(src_s.width(), src_s.height())
+        width = 0 if self._close else size[0]
+        rw = self._results_box.widget()
+        if rw is None:
+            raise Exception(
+                "Not able to update size since self._results_box.widget() is None unexpectedly."
+            )
+        height = min(rw.height() + self._query_box.height(), size[1])
+
+        if self.width() != width:
+            self._width_anim.stop()
+            self._width_anim.setEndValue(width)
+            self._width_anim.start()
+        if self.height() != height:
+            self._height_anim.stop()
+            self._height_anim.setEndValue(height)
+            self._height_anim.start()
+
     @override
     def show(self, /) -> None:
         self._close = False
@@ -322,19 +465,18 @@ class MainWindow(QWidget):
         QTimer.singleShot(1, self.activateWindow)
         self._query_box.setFocus()
         self._query_box.selectAll()
+
         self._width_anim.stop()
         self._width_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
         self._width_anim.setDuration(200)
-        self._width_anim.setEndValue(SCALE[0])
-        self._width_anim.start()
+        self._update_size()
 
     def _despawn(self) -> None:
         self._close = True
         self._width_anim.stop()
         self._width_anim.setEasingCurve(QEasingCurve.Type.InExpo)
         self._width_anim.setDuration(100)
-        self._width_anim.setEndValue(1)
-        self._width_anim.start()
+        self._update_size()
 
     @override
     def event(self, event: QEvent, /) -> bool:
@@ -342,3 +484,17 @@ class MainWindow(QWidget):
             logger.debug("deactivate event")
             self._despawn()
         return super().event(event)
+
+    @override
+    def resizeEvent(self, event: QResizeEvent, /) -> None:
+        super().resizeEvent(event)
+        self._corner_mask.resize(event.size())
+
+    @override
+    def paintEvent(self, event: QPaintEvent, /) -> None:
+        _color = theme.main_window.background_color.value
+        color = self.palette().window() if _color is None else QColor(_color)
+        with QPainter(self) as p:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(color)
+            p.drawRect(self.rect())
