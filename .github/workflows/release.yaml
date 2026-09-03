@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Extract version from tag
         id: version
@@ -48,17 +48,17 @@ jobs:
         id: installer
         shell: bash
         run: |
-          FILE=$(find dist -name "*.exe" | head -n 1)
+          FILE=$(find dist -maxdepth 1 -name "*setup*.exe" | head -n 1)
           echo "path=$FILE" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: prospero-installer
           path: ${{ steps.installer.outputs.path }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Prospero ${{ steps.version.outputs.tag }}
