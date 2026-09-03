@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import sys
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, overload, override
@@ -71,7 +72,7 @@ class Command:
 
 
 _COMMANDS: dict[str, Command] = {
-    "Quit": (x := Command("func", None, quit, "Quits the application")),
+    "Quit": (x := Command("func", None, sys.exit, "Quits the application")),
     "q": x,
     "Power: Shutdown": Command("func", None, shutdown_respect_hybrid, "Shuts down the computer"),
     "Power: Restart": Command("shell", "shutdown.exe /r /t 0", None, "Restarts the computer"),

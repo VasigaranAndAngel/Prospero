@@ -28,6 +28,7 @@ class Configs(BaseSettings):
         env_prefix=APPLICATION_NAME.upper() + "_",
         env_nested_delimiter="__",
         cli_parse_args=True,
+        cli_ignore_unknown_args=True,
     )
     general: Annotated[GeneralCategory, Category()] = Field(
         default_factory=GeneralCategory,
