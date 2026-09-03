@@ -34,7 +34,7 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Build with PyInstaller
-        run: python -m PyInstaller prospero.spec --clean --noconfirm
+        run: uv run PyInstaller prospero.spec --clean --noconfirm
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
