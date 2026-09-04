@@ -1,9 +1,3 @@
-"""
-TODO: Notices memory leak kind of issue. sometimes, it uses upto 2GB of ram when only checking Icon\
-widget. Check and make sure there are no memory leak kind of issues. Known suspect is storing\
-QPixmaps in a dict in _SpinnerFrames.
-"""
-
 import math
 import time
 from enum import Enum, auto
@@ -167,6 +161,9 @@ class _IconState(Enum):
 class Icon(QLabel):
     _image_loaded: Signal = Signal(object)
     _instances: int = 0
+    _icon_cache: dict[IconLoadMethod, tuple[QImage | None, float]] = {}
+    """Cache data of the fetched icons.
+    dict[IconLoadMethod, tuple[<fetched icon if fetched>, <time of fetch>]]"""
 
     def __init__(self, icon_load_method: IconLoadMethod, parent: QWidget | None = None) -> None:
         super().__init__()
@@ -189,9 +186,22 @@ class Icon(QLabel):
         _ = self._loading_timer.timeout.connect(self._next_frame)
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        _ = self._image_loaded.connect(self._on_loaded)
-        self._set_state(_IconState.Loading)
-        _ = THREAD_POOL.apply_async(self._load_icon)
+
+        # no need to fetch icon if load_method is default or loading
+        if self._i_load_method.load_method in {LoadMethod.default, LoadMethod.loading}:
+            self._on_loaded(None)
+
+        else:
+            cached = self._icon_cache.get(self._i_load_method)
+            # Check if the icon is cached and cached time is not expired.
+            # if no or it is None or time is expired then fetch icon.
+            if cached is not None and cached[1] > time.time() - 60 * 10:  # 10 minutes
+                self._on_loaded(cached[0])
+
+            else:
+                self._set_state(_IconState.Loading)
+                _ = self._image_loaded.connect(self._on_loaded)
+                _ = THREAD_POOL.apply_async(self._load_icon)
 
     def _load_icon(self, attempt: int = 1) -> None:
         ic = None
@@ -219,6 +229,7 @@ class Icon(QLabel):
                 return
 
             ic = None
+        self._icon_cache[self._i_load_method] = ic, time.time()
         self._image_loaded.emit(ic)
 
     def _on_loaded(self, image: QImage | None) -> None:
