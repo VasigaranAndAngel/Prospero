@@ -481,7 +481,6 @@ class MainWindow(QWidget):
     @override
     def event(self, event: QEvent, /) -> bool:
         if event.type() == event.Type.WindowDeactivate:
-            logger.debug("deactivate event")
             self._despawn()
         return super().event(event)
 

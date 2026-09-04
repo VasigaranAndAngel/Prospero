@@ -34,18 +34,11 @@ class StartApp(BaseModel):
     AppID: str
 
 
-class AppxPackage(BaseModel):
-    AppID: str
-    InstallLocation: str
-    Logo: str
-    PackageFamilyName: str
-
-
 @dataclass
 class ShortcutTarget:
     Name: str
     LnkPath: Path
-    Icon: "IconLoadMethod"
+    icon_load_method: "IconLoadMethod"
 
 
 @dataclass
@@ -62,6 +55,7 @@ def _run_ps(command: str):
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
         capture_output=True,
         text=True,
+        shell=True,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr)
@@ -78,41 +72,8 @@ def _get_start_apps() -> list[StartApp]:
     )
 
 
-def _get_appx_packages() -> list[AppxPackage]:
-    """Map UWP apps to their install location + manifest for icon lookup."""
-    ps_script = r"""
-    Get-AppxPackage | ForEach-Object {
-        $pkg = $_
-        try {
-            $manifest = Get-AppxPackageManifest $pkg
-            $apps = $manifest.Package.Applications.Application
-            foreach ($app in $apps) {
-                $appId = $app.Id
-                $fullAppId = "$($pkg.PackageFamilyName)!$appId"
-                $logo = $app.VisualElements.Square44x44Logo
-                [PSCustomObject]@{
-                    AppID = $fullAppId
-                    InstallLocation = $pkg.InstallLocation
-                    Logo = $logo
-                    PackageFamilyName = $pkg.PackageFamilyName
-                }
-            }
-        } catch {}
-    } | ConvertTo-Json -Depth 3
-    """
-    out = _run_ps(ps_script)
-    if not out.strip():
-        return []
-    data: list[dict[str, str]] | dict[str, str] = json.loads(out)  # pyright: ignore[reportAny]
-    return (
-        [AppxPackage.model_validate(x) for x in data]
-        if isinstance(data, list)
-        else [AppxPackage.model_validate(data)]
-    )
-
-
 def _get_shortcut_targets() -> list[ShortcutTarget]:
-    """Map shortcut-based (desktop) apps: Name -> target exe path + icon."""
+    "Retrieves launch targets (files) from SHORTCUT_PATHS and returns as list of ShortcutTarget."
     paths: list[ShortcutTarget] = []
 
     # Get all the files
@@ -128,7 +89,7 @@ def _get_shortcut_targets() -> list[ShortcutTarget]:
                 if _con:
                     continue
                 icon = IconLoadMethod(LoadMethod.win32api, _p)
-                paths.append(ShortcutTarget(Name=_p.stem, LnkPath=_p, Icon=icon))
+                paths.append(ShortcutTarget(Name=_p.stem, LnkPath=_p, icon_load_method=icon))
 
     return paths
 
@@ -139,39 +100,36 @@ def _build_full_app_list() -> list[AppDetail]:
     start_apps = _get_start_apps()
     logger.debug(f"start app retrieving took: {time.perf_counter() - t1}")
     t2 = time.perf_counter()
-    appx = {a.AppID: a for a in _get_appx_packages() if a.AppID}
-    logger.debug(f"appx packages retrieving took: {time.perf_counter() - t2}")
-    t3 = time.perf_counter()
     shortcuts = {s.Name: s for s in _get_shortcut_targets()}
-    logger.debug(f"shortcuts retrieving took: {time.perf_counter() - t3}")
-    t4 = time.perf_counter()
+    logger.debug(f"shortcuts retrieving took: {time.perf_counter() - t2}")
+    t3 = time.perf_counter()
 
     full_list: list[AppDetail] = []
-    for app in start_apps:
-        name = app.Name
-        app_id = app.AppID
-        entry = AppDetail(app_name=name, app_id=app_id)
 
-        if app_id in appx:
-            # UWP / Store app
-            pkg = appx[app_id]
-            entry.type = "uwp"
-            entry.path = Path(pkg.InstallLocation)
-            logo_rel = pkg.Logo
-            if pkg.InstallLocation and logo_rel:
-                entry.icon = IconLoadMethod(LoadMethod.win32api_windows_app, app_id=app_id)
-        elif name in shortcuts:
-            # Desktop app via shortcut
-            sc = shortcuts[name]
-            entry.type = "desktop"
-            entry.path = Path(sc.LnkPath)
-            entry.icon = sc.Icon
-        else:
-            entry.type = "unknown"
+    # all uwp apps.
+    for sa in filter(lambda x: "!" in x.AppID, start_apps):  # filtering only uwp apps.
+        full_list.append(
+            AppDetail(
+                app_name=sa.Name,
+                app_id=sa.AppID,
+                type="uwp",
+                icon=IconLoadMethod(LoadMethod.win32api_windows_app, app_id=sa.AppID),
+            )
+        )
 
-        full_list.append(entry)
+    # all shortcut entries
+    for name, s in shortcuts.items():
+        full_list.append(
+            AppDetail(
+                app_name=name,
+                type="desktop",
+                path=s.LnkPath,
+                icon=s.icon_load_method,
+            )
+        )
 
-    logger.debug(f"full app list prepared in {time.perf_counter() - t4}")
+    logger.debug(f"full app list prepared in {time.perf_counter() - t3}")
+
     return full_list
 
 

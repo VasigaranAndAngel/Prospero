@@ -63,7 +63,9 @@ def cli() -> None:
         for provider in providers:
             results.extend(provider.search(query_buffer))
 
-        first_res = results[0] if results else None
+        results.sort(key=lambda x: x.score)  # sorted upside down
+
+        first_res = results[-1] if results else None
 
         # prepare results
         p_lines: list[str] = []

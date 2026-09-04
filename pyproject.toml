@@ -17,6 +17,9 @@ dependencies = [
 build = [
     "pyinstaller>=6.22.2",
 ]
+cli = [
+    "pyperclip>=1.11.0",
+]
 
 [dependency-groups]
 dev = [

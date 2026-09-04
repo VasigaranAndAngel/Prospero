@@ -111,6 +111,7 @@ _shell32.ILFree.argtypes = [ctypes.c_void_p]
 
 
 def fetch_windows_app_icon(app_user_model_id: str, size: int = 32) -> QImage:
+    "Retrieves the icon for a Windows application by its App User Model ID"
     shell_path = f"shell:AppsFolder\\{app_user_model_id}"
 
     pidl = ctypes.c_void_p()

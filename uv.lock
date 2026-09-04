@@ -190,6 +190,9 @@ dependencies = [
 build = [
     { name = "pyinstaller" },
 ]
+cli = [
+    { name = "pyperclip" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -204,12 +207,13 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.22.2" },
     { name = "pynput", specifier = ">=1.8.2" },
+    { name = "pyperclip", marker = "extra == 'cli'", specifier = ">=1.11.0" },
     { name = "pyqtgraph", specifier = ">=0.14.0" },
     { name = "pyside6", specifier = ">=6.11.1" },
     { name = "pywin32", specifier = ">=312" },
     { name = "tomli-w", specifier = ">=1.2.0" },
 ]
-provides-extras = ["build"]
+provides-extras = ["build", "cli"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -403,6 +407,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3b/f6/2a8b84dbf1fe7c04dd96ea73d991678d4e09a909f51971ecc51629bb2ab4/pyobjc_framework_quartz-12.2.1.tar.gz", hash = "sha256:b3b8b6f71e66147f8ff9e6213864cc8527e3a0b1ee90835b93ce221f4802d9b0", size = 3215521, upload-time = "2026-06-19T16:21:30.199Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/fc/d7c7b3134cdbd1a487f3f77b5be125d87a6c9e7d9411035739d99335cc0c/pyobjc_framework_quartz-12.2.1-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:de9c8cca7e95290c8d540466af11c7cdfe3a5458e6f56c34006d5b45243f9ed9", size = 219000, upload-time = "2026-06-19T16:16:04.29Z" },
+]
+
+[[package]]
+name = "pyperclip"
+version = "1.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/52/d87eba7cb129b81563019d1679026e7a112ef76855d6159d24754dbd2a51/pyperclip-1.11.0.tar.gz", hash = "sha256:244035963e4428530d9e3a6101a1ef97209c6825edab1567beac148ccc1db1b6", size = 12185, upload-time = "2025-09-26T14:40:37.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/80/fc9d01d5ed37ba4c42ca2b55b4339ae6e200b456be3a1aaddf4a9fa99b8c/pyperclip-1.11.0-py3-none-any.whl", hash = "sha256:299403e9ff44581cb9ba2ffeed69c7aa96a008622ad0c46cb575ca75b5b84273", size = 11063, upload-time = "2025-09-26T14:40:36.069Z" },
 ]
 
 [[package]]

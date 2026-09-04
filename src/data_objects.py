@@ -18,11 +18,17 @@ from typing import override
 
 class LoadMethod(Enum):
     win32api = auto()
+    "Fetch icon with win32 api of a file."
     win32api_generic = auto()
+    "Fetch generic icon with win32 api of a file."
     win32api_windows_app = auto()
+    "Retrieves the icon for a Windows application by its App User Model ID"
     load_file = auto()
+    "Loads the icon from icon/image file path."
     default = auto()
+    "Shows the default icon. (Doesn't look for any icons)"
     loading = auto()
+    "Shows the loading animation. (Doesn't look for any icons)"
 
 
 @dataclass

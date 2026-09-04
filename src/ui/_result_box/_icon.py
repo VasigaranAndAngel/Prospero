@@ -5,6 +5,7 @@ QPixmaps in a dict in _SpinnerFrames.
 """
 
 import math
+import time
 from enum import Enum, auto
 from typing import override
 
@@ -192,7 +193,7 @@ class Icon(QLabel):
         self._set_state(_IconState.Loading)
         _ = THREAD_POOL.apply_async(self._load_icon)
 
-    def _load_icon(self) -> None:
+    def _load_icon(self, attempt: int = 1) -> None:
         ic = None
         try:
             lm, path = self._i_load_method.load_method, self._i_load_method.file_path
@@ -210,7 +211,13 @@ class Icon(QLabel):
             elif lm is LoadMethod.load_file:
                 ic = QImage(path)
         except Exception as e:
-            print(f"failed fetching: {e}")
+            print(f"failed fetching (attempt: {attempt}): {e}")
+
+            if attempt < 5:  # retry 5 times since it fails sometimes
+                time.sleep(1)
+                self._load_icon(attempt + 1)
+                return
+
             ic = None
         self._image_loaded.emit(ic)
 
