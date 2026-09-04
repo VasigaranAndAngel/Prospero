@@ -75,20 +75,31 @@ def cli() -> None:
 
 
 def ui() -> None:
-    from PySide6.QtGui import QAction
+    from PySide6.QtGui import QAction, QIcon
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+    import assets
+    import constants
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
 
     app = QApplication(sys.argv)
-    tray = QSystemTrayIcon()
+
+    window = MainWindow()
+    window.show()
+
+    tray = QSystemTrayIcon(
+        QIcon(assets.APP_ICON_PNG.as_posix()), window, toolTip=constants.APPLICATION_NAME.title()
+    )
+    def _on_ac(reason: QSystemTrayIcon.ActivationReason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            window.show()
+
+    _ = tray.activated.connect(_on_ac)
     tray.setContextMenu(menu := QMenu("Quit"))
     menu.addAction(act := QAction("Quit"))
     _ = act.triggered.connect(app.quit)
     tray.show()
-    window = MainWindow()
-    window.show()
 
     hk_listener = HotkeyListener()
     _ = hk_listener.trigger.connect(window.show)
