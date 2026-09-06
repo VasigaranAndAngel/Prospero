@@ -30,3 +30,42 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// Helper function to check if a command-line parameter exists
+function CmdLineParamExists(const ParamName: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(I), ParamName) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function ShouldAutoStart: Boolean;
+begin
+  Result := WizardSilent and CmdLineParamExists('/AUTOSTART');
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ErrorCode: Integer;
+begin
+  if (CurStep = ssDone) and ShouldAutoStart then
+  begin
+    Exec(
+      ExpandConstant('{app}\{#MyAppExeName}'),
+      '',
+      '',
+      SW_SHOWNORMAL,
+      ewNoWait,
+      ErrorCode
+    );
+  end;
+end;

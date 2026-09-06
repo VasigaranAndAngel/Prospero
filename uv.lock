@@ -174,9 +174,9 @@ wheels = [
 
 [[package]]
 name = "prospero"
-version = "0.0.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
+    { name = "packaging" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pynput" },
@@ -203,6 +203,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "packaging", specifier = ">=26.2" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.22.2" },

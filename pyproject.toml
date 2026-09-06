@@ -1,9 +1,14 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
 [project]
 name = "Prospero"
 description = ""
-version = "0.0.1"
+dynamic = ["version"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "packaging>=26.2",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "pynput>=1.8.2",
@@ -27,6 +32,12 @@ dev = [
     "pyside-widget-reloader>=0.0.3",
     "pytest>=9.1.1",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/_version.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
