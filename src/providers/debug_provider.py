@@ -6,7 +6,8 @@ from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 from providers import LoadingRequest
 
-from ._base_provider import BaseProvider
+from ._loading_request import LoadingRequest
+from .base_result_and_widgets import BaseResult, ExecutionActions
 from ._base_result import BaseResult
 
 

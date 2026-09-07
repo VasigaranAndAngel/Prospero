@@ -3,8 +3,8 @@ from collections.abc import Callable, Collection
 
 from global_threading import THREAD_POOL
 
-from ._base_result import BaseResult
 from ._loading_request import LoadingRequest
+from .base_result_and_widgets import BaseResult
 
 
 class BaseProvider(ABC):

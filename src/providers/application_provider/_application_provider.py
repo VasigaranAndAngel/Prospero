@@ -10,8 +10,8 @@ from data_objects import IconLoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
-from .._base_result import BaseResult, ExecutionActions, ResultAttributes
 from .._loading_request import LoadingRequest
+from ..base_result_and_widgets import BaseResult, ExecutionActions, ResultAttributes
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
 logger = logging.getLogger(__name__)

@@ -17,13 +17,11 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
-from providers import LoadingRequest, search_async
-from providers._base_result import BaseResult
+from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
+from shared_ui_elements import CustomVBoxLayout
 from theme import theme
 
 from ._query_box import QueryBox
-from ._result_box import ResultBox
-from ._result_box._layout import CustomVBoxLayout
 from ._results_box import ResultsBox
 
 logger = logging.getLogger(__name__)
@@ -152,7 +150,7 @@ class MainWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        self._result_boxes: list[ResultBox] = []
+        self._result_boxes: list[BaseResultBoxWidget] = []
         self._shadow_focused_idx: int | None = None
         self._mouse_pressed: QPoint | None = None
         self._loading_requests: list[LoadingRequest] = []
@@ -268,7 +266,11 @@ class MainWindow(QWidget):
             if (x := hash(res)) in preserved:
                 res_box = preserved[x]
             else:
-                res_box = ResultBox(res.result, res)
+                wid_fac = res.result_widget_factory
+                if wid_fac is not None:
+                    res_box = wid_fac(res.result, res)
+                else:
+                    res_box = ResultBox(res.result, res)
                 res_box.setMinimumWidth(self.width())
                 layout.newly_added_widgets.append(res_box)
                 connection = res_box.focus_request.connect(self._on_focus_request)

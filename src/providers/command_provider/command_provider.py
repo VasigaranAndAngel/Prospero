@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, overload, override
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
-from .._base_result import BaseResult, ExecutionActions
+from ..base_result_and_widgets import BaseResult, BaseResultBoxWidget, ExecutionActions
 from ._shutdown import shutdown_respect_hybrid
 
 logger = logging.getLogger(__name__)

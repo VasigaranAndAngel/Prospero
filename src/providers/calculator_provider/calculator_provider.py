@@ -2,7 +2,7 @@ from collections.abc import Collection
 from typing import override
 
 from .._base_provider import BaseProvider
-from .._base_result import BaseResult, ExecutionActions
+from ..base_result_and_widgets import BaseResult, ExecutionActions
 from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
 
 

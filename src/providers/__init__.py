@@ -6,9 +6,15 @@ results from all providers.
 
 from collections.abc import Callable, Collection
 
-from ._base_result import BaseResult, ExecutionActions
 from ._loading_request import LoadingRequest
 from .application_provider import AppProvider
+from .base_result_and_widgets import (
+    BaseResult,
+    BaseResultBoxWidget,
+    ExecutionActions,
+    ResultAttributes,
+    ResultBox,
+)
 from .calculator_provider import CalcProvider
 from .command_provider import CommandProvider
 from .debug_provider import DebugProvider
@@ -59,6 +65,9 @@ __all__ = [
     "DebugProvider",
     "PROVIDERS",
     "BaseResult",
+    "BaseResultBoxWidget",
     "ExecutionActions",
+    "ResultAttributes",
+    "ResultBox",
     "LoadingRequest",
 ]
