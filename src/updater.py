@@ -54,8 +54,21 @@ class GithubLatestRelease(BaseModel):
 
 
 class Updater(QObject):
+    """This is a singleton object which can check for new version of application and download and
+    install it.
+    """
+
+    _ins: ClassVar["Updater | None"] = None
     update_available: Signal = Signal(object)
     "Will be emitted with a GithubLatestRelease instance of latest version if available."
+    downloaded: Signal = Signal(Downloaded)
+    "Will be emitted while the file is downloading and downloaded."
+
+    def __new__(cls, parent: QWidget | None = None) -> "Updater":
+        "To make it singleton."
+        if cls._ins is None:
+            cls._ins = super().__new__(cls)
+        return cls._ins
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -82,6 +95,7 @@ class Updater(QObject):
             logger.warning(f"Failed to fetch latest release from github: {reply.errorString()}")
 
     def get_latest_release(self, callback: Callable[[GithubLatestRelease], None]) -> None:
+        logger.debug("Fetching github for latest release.")
         uri = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
         reply = self._network_manager.get(QNetworkRequest(uri))
 
@@ -91,21 +105,22 @@ class Updater(QObject):
         _ = reply.finished.connect(_wrapper)
 
     def check_update(self) -> None:
+        logger.debug("Checking for update...")
         def _callback(release: GithubLatestRelease) -> None:
             if release.get_version() > APPLICATION_VERSION:
-                self.update_available.emit()
+                self.update_available.emit(release)
 
         self.get_latest_release(_callback)
 
-    def update(self, release: GithubLatestRelease, callback: Callable[[Downloaded], None]) -> None:
+    def update(self, release: GithubLatestRelease) -> None:
         """Downloads Prosper of version of given release and update the application.
 
-        Calls callback with Downloaded parameter to update the progress of download.
+        Emits the self.downloaded with Downloaded parameter to update the progress of download.
 
         Args:
             release (GithubLatestRelease): github release to download the file from.
-            callback (Callable[[Download], None]): A callable to call with download progress.
         """
+        logger.debug("Update sequence started...")
         file_asset = release.assets[0]
         tmp_dir = tempfile.mkdtemp(prefix=APPLICATION_NAME.title() + " Installer")
         file_path = Path(tmp_dir) / file_asset.name
@@ -114,11 +129,11 @@ class Updater(QObject):
         reply = self._network_manager.get(QNetworkRequest(file_asset.browser_download_url))
 
         def _on_downloading(downloaded: int, total: int) -> None:
-            callback(Downloaded(total / downloaded * 100, downloaded, total, False))
+            self.downloaded.emit(Downloaded(total / downloaded * 100, downloaded, total, False))
 
         def _on_downloaded() -> None:
             _ = file_path.write_bytes(reply.readAll().data())
-            callback(Downloaded(100, file_asset.size, file_asset.size, True, file_path))
+            self.downloaded.emit(Downloaded(100, file_asset.size, file_asset.size, True, file_path))
 
         _ = reply.downloadProgress.connect(_on_downloading)
         _ = reply.finished.connect(_on_downloaded)

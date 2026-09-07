@@ -31,7 +31,7 @@ class LoadMethod(Enum):
     "Shows the loading animation. (Doesn't look for any icons)"
 
 
-@dataclass
+@dataclass(frozen=True)
 class IconLoadMethod:
     """
     how an icon should be loaded

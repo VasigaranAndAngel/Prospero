@@ -14,7 +14,7 @@ from ._shutdown import shutdown_respect_hybrid
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Command:
     command_type: Literal["shell", "func"]
     shell_command: str | None
@@ -86,31 +86,25 @@ _COMMANDS: dict[str, Command] = {
 }
 
 
+@dataclass
 class CommandResult(BaseResult):
-    def __init__(
-        self,
-        result: str,
-        score: int,
-        highlighted_indexes: list[int],
-        description: str | None,
-        func: Callable[[], None],
-    ) -> None:
-        super().__init__(result, score, highlighted_indexes, description)
-
-        self._func: Callable[[], None] = func
+    func: Callable[[], None] | None = None
 
     @override
     def execute(self, action: ExecutionActions) -> None:
-        if action is ExecutionActions.Enter:
-            self._func()
+        if action is ExecutionActions.Enter and self.func is not None:
+            self.func()
+
+    @override
+    def __hash__(self) -> int:
+        return super().__hash__()
 
 
+@dataclass
 class CommandChoice(BaseChoice):
-    def __init__(self, text: str, func: Callable[[], None], description: str) -> None:
-        super().__init__(text)
-
-        self.func: Callable[[], None] = func
-        self.description: str = description
+    func: Callable[[], None]
+    description: str
+    result_widget_factory: Callable[[str, BaseResult], BaseResultBoxWidget] | None = None
 
 
 class CommandProvider(BaseProvider):

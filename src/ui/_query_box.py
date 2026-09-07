@@ -76,8 +76,9 @@ class QueryBox(QLineEdit):
 
     def set_loading_state(self, state: bool) -> None:
         if not self._loading_state and state:
-            self._render_line = True
-            self._start_loading_anim.emit()
+            if not self._render_line:
+                self._render_line = True
+                self._start_loading_anim.emit()
         self._loading_state = state
 
     @override

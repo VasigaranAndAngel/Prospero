@@ -3,8 +3,8 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from providers import BaseResult
     from providers._base_provider import BaseProvider
-    from providers._base_result import BaseResult
 
 
 class CLIRenderer:
@@ -29,8 +29,7 @@ def cli() -> None:
     import msvcrt
     import string
 
-    from providers import PROVIDERS
-    from providers._base_result import ExecutionActions
+    from providers import PROVIDERS, ExecutionActions
 
     # Prepare providers
     providers: list[BaseProvider] = []
@@ -93,6 +92,7 @@ def ui() -> None:
     tray = QSystemTrayIcon(
         QIcon(assets.APP_ICON_PNG.as_posix()), window, toolTip=constants.APPLICATION_NAME.title()
     )
+
     def _on_ac(reason: QSystemTrayIcon.ActivationReason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             window.show()

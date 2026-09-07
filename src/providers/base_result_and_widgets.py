@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import override
 
+# TODO: This module will be imported on cli mode too. which imports unwanted PySide6
 from PySide6.QtCore import QEasingCurve, QMetaObject, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QColor, QFocusEvent, QKeyEvent, QMouseEvent, QPainter, QPaintEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
