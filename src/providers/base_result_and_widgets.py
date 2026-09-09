@@ -7,7 +7,7 @@ exported from providers.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import IntFlag, auto
 from typing import override
 
 # TODO: This module will be imported on cli mode too. which imports unwanted PySide6
@@ -23,8 +23,11 @@ def _get_default_icon() -> "IconLoadMethod":
     return IconLoadMethod(LoadMethod.default)
 
 
-class ExecutionActions(Enum):
+class ExecutionAction(IntFlag):
     Enter = auto()
+    DoubleClick = auto()
+
+    Trigger = Enter | DoubleClick
 
 
 @dataclass
@@ -54,7 +57,7 @@ class BaseResult:
             [f"{open_tag}{c}{close_tag}" if i in ih else f"{c}" for i, c in enumerate(self.result)]
         )
 
-    def execute(self, action: ExecutionActions) -> None:  # pyright: ignore[reportUnusedParameter]
+    def execute(self, action: ExecutionAction) -> None:  # pyright: ignore[reportUnusedParameter]
         raise NotImplementedError
 
     @override
@@ -82,10 +85,21 @@ class BaseResultBoxWidget(QWidget):
     def set_description(self, desc: str | None) -> None:
         raise NotImplementedError
 
+    def request_deletion(self) -> None:
+        """This will be called by MainWindow when this widget is no longer needed.
+
+        If providers need to do something else instead deleting the widget, it can override this
+        method to do so.
+        """
+        self.deleteLater()
+
+    def execute_execution_action(self, action: ExecutionAction) -> None:
+        self.result.execute(action)
+
     @override
     def keyReleaseEvent(self, event: QKeyEvent, /) -> None:
         if event.key() == Qt.Key.Key_Return:
-            self.result.execute(ExecutionActions.Enter)
+            self.execute_execution_action(ExecutionAction.Enter)
             event.accept()
             return
         return super().keyReleaseEvent(event)
@@ -94,6 +108,11 @@ class BaseResultBoxWidget(QWidget):
     def mousePressEvent(self, event: QMouseEvent, /) -> None:
         self.focus_request.emit(self)
         return super().mousePressEvent(event)
+
+    @override
+    def mouseDoubleClickEvent(self, event: QMouseEvent, /) -> None:
+        self.execute_execution_action(ExecutionAction.DoubleClick)
+        event.accept()
 
 
 class ResultBox(BaseResultBoxWidget):
@@ -108,6 +127,7 @@ class ResultBox(BaseResultBoxWidget):
 
         main_lay.addWidget(icon := Icon(result.icon_load_method, self))
         icon.setFixedSize(40, 40)
+        self._icon: Icon = icon
 
         main_lay.addLayout(txt_lay := CustomVBoxLayout())
         txt_lay.setContentsMargins(0, 0, 0, 0)
@@ -125,6 +145,7 @@ class ResultBox(BaseResultBoxWidget):
         name_label.move(init_x, init_y - name_label.height() // 2)
         info_label.move(init_x, init_y - info_label.height() // 2)
 
+        self._name_widget: QLabel = name_label
         self._description_widget: QLabel = info_label
         font = name_label.font()
         font.setPointSize(int(font.pointSize() * 1.3))
@@ -157,6 +178,9 @@ class ResultBox(BaseResultBoxWidget):
             self._description_widget.setText(desc)
             self._description_widget.show()
 
+    def set_name(self, name: str) -> None:
+        self._name_widget.setText(name)
+
     @override
     def focusInEvent(self, event: QFocusEvent, /) -> None:
         self._change_color(QColor("#10ff0000"))
@@ -180,4 +204,4 @@ class ResultBox(BaseResultBoxWidget):
             p.drawRect(self.rect().adjusted(0, 0, -1, -1))
 
 
-__all__ = ["ExecutionActions", "ResultAttributes", "BaseResult", "BaseResultBoxWidget", "ResultBox"]
+__all__ = ["ExecutionAction", "ResultAttributes", "BaseResult", "BaseResultBoxWidget", "ResultBox"]

@@ -2,13 +2,13 @@ from collections.abc import Collection
 from typing import override
 
 from .._base_provider import BaseProvider
-from ..base_result_and_widgets import BaseResult, ExecutionActions
+from ..base_result_and_widgets import BaseResult, ExecutionAction
 from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
 
 
 class CalcResult(BaseResult):
     @override
-    def execute(self, action: ExecutionActions) -> None:
+    def execute(self, action: ExecutionAction) -> None:
         try:
             import pyperclip  # if pyperclip is available, use it.
 

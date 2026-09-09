@@ -19,7 +19,7 @@ a = Analysis(
         "PySide6.QtMultimedia",
         "PySide6.QtMultimediaWidgets",
         "PySide6.QtSql",
-        "PySide6.QtNetwork",
+        # "PySide6.QtNetwork",
         "PySide6.QtXml",
         "PySide6.QtBluetooth",
         "PySide6.QtPositioning",

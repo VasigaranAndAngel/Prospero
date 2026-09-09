@@ -11,7 +11,7 @@ from .application_provider import AppProvider
 from .base_result_and_widgets import (
     BaseResult,
     BaseResultBoxWidget,
-    ExecutionActions,
+    ExecutionAction,
     ResultAttributes,
     ResultBox,
 )
@@ -66,7 +66,7 @@ __all__ = [
     "PROVIDERS",
     "BaseResult",
     "BaseResultBoxWidget",
-    "ExecutionActions",
+    "ExecutionAction",
     "ResultAttributes",
     "ResultBox",
     "LoadingRequest",

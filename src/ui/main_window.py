@@ -20,6 +20,7 @@ from configs import conf
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
 from shared_ui_elements import CustomVBoxLayout
 from theme import theme
+from updater import GithubLatestRelease
 
 from ._query_box import QueryBox
 from ._results_box import ResultsBox
@@ -239,7 +240,7 @@ class MainWindow(QWidget):
             )
 
         # Preserve same hash results
-        preserved: dict[int, ResultBox] = {}
+        preserved: dict[int, BaseResultBoxWidget] = {}
         new_hashes = [hash(x) for x in self._current_results]
         # calc_in_new = any([lambda x: x.name == "Calculation Provider" for x in self._current_results])
 
@@ -248,7 +249,9 @@ class MainWindow(QWidget):
             item = layout.itemAt(0)
             if item is None:
                 continue
-            wid = cast(ResultBox | None, item.widget())  # type of child widgets are ResultBox
+            wid = cast(
+                BaseResultBoxWidget | None, item.widget()
+            )  # type of child widgets are BaseResultBoxWidget
             if wid is None:
                 continue
             layout.removeWidget(wid)
@@ -259,7 +262,7 @@ class MainWindow(QWidget):
             # disconnect focus request connections
             if (con := wid.focus_request_connection) is not None:
                 _ = wid.focus_request.disconnect(con)
-            wid.deleteLater()
+            wid.request_deletion()
 
         # Add new widgets
         for res in self._current_results:
@@ -271,7 +274,7 @@ class MainWindow(QWidget):
                     res_box = wid_fac(res.result, res)
                 else:
                     res_box = ResultBox(res.result, res)
-                res_box.setMinimumWidth(self.width())
+                res_box.setFixedWidth(self.width())
                 layout.newly_added_widgets.append(res_box)
                 connection = res_box.focus_request.connect(self._on_focus_request)
                 res_box.focus_request_connection = connection
@@ -360,6 +363,10 @@ class MainWindow(QWidget):
             self._update_geo()
 
     # endregion
+
+    def update_available(self, release: GithubLatestRelease) -> None:
+        # TODO: implement to indicate the update on main window
+        raise NotImplementedError
 
     @override
     def keyPressEvent(self, event: QKeyEvent, /) -> None:

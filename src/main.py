@@ -29,7 +29,7 @@ def cli() -> None:
     import msvcrt
     import string
 
-    from providers import PROVIDERS, ExecutionActions
+    from providers import PROVIDERS, ExecutionAction
 
     # Prepare providers
     providers: list[BaseProvider] = []
@@ -49,7 +49,7 @@ def cli() -> None:
                 break
             case "\r":
                 if first_res is not None:
-                    first_res.execute(ExecutionActions.Enter)
+                    first_res.execute(ExecutionAction.Enter)
                 continue
             case "\x08":
                 query_buffer = query_buffer[:-1]
@@ -83,6 +83,7 @@ def ui() -> None:
     import constants
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
+    from updater import Updater
 
     app = QApplication(sys.argv)
 
@@ -107,6 +108,10 @@ def ui() -> None:
     _ = hk_listener.trigger.connect(window.show)
     _ = atexit.register(hk_listener.stop)
     hk_listener.start()
+
+    # Set parent of Updater to window
+    u = Updater()
+    u.setParent(window)
 
     _ = app.exec()
 

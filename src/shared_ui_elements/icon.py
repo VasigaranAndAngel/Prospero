@@ -187,21 +187,7 @@ class Icon(QLabel):
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # no need to fetch icon if load_method is default or loading
-        if self._i_load_method.load_method in {LoadMethod.default, LoadMethod.loading}:
-            self._on_loaded(None)
-
-        else:
-            cached = self._icon_cache.get(self._i_load_method)
-            # Check if the icon is cached and cached time is not expired.
-            # if no or it is None or time is expired then fetch icon.
-            if cached is not None and cached[1] > time.time() - 60 * 10:  # 10 minutes
-                self._on_loaded(cached[0])
-
-            else:
-                self._set_state(_IconState.Loading)
-                _ = self._image_loaded.connect(self._on_loaded)
-                _ = THREAD_POOL.apply_async(self._load_icon)
+        self.update_load_method(self._i_load_method)
 
     def _load_icon(self, attempt: int = 1) -> None:
         ic = None
@@ -260,6 +246,26 @@ class Icon(QLabel):
 
     def _reset_loading_frame(self) -> None:
         self._loading_frame = self._instance_no * -2 % self._loading_fps - 2  # to add variations
+
+    def update_load_method(self, load_method: IconLoadMethod) -> None:
+        self._i_load_method = load_method
+
+        # no need to fetch icon if load_method is default or loading
+        if self._i_load_method.load_method in {LoadMethod.default, LoadMethod.loading}:
+            self.clear()
+            self._on_loaded(None)
+
+        else:
+            cached = self._icon_cache.get(self._i_load_method)
+            # Check if the icon is cached and cached time is not expired.
+            # if no or it is None or time is expired then fetch icon.
+            if cached is not None and cached[1] > time.time() - 60 * 10:  # 10 minutes
+                self._on_loaded(cached[0])
+
+            else:
+                self._set_state(_IconState.Loading)
+                _ = self._image_loaded.connect(self._on_loaded)
+                _ = THREAD_POOL.apply_async(self._load_icon)
 
     @override
     def showEvent(self, event: QShowEvent, /) -> None:
