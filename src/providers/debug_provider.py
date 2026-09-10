@@ -1,29 +1,42 @@
+import logging
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import override
 
 from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
-from providers import LoadingRequest
+from helpers import task_schedule_handler
 
+from ._base_provider import BaseProvider
 from ._loading_request import LoadingRequest
-from .base_result_and_widgets import BaseResult, ExecutionActions
-from ._base_result import BaseResult
+from .base_result_and_widgets import BaseResult, ExecutionAction
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class DebugChoice(BaseChoice):
-    icon: IconLoadMethod
+    icon: IconLoadMethod = IconLoadMethod(LoadMethod.default)
     loading_line: bool = False
+    execute: Callable[[], None] | None = None
 
 
 @dataclass
 class DebugResult(BaseResult):
     loading_line: bool = False
+    execute_: Callable[[], None] | None = None
 
     @override
     def __hash__(self) -> int:
         return super().__hash__()
+
+    @override
+    def execute(self, action: ExecutionAction) -> None:
+        logger.debug(
+            f"executed; {action in ExecutionAction.Trigger=}; {self.execute_ is not None=}"
+        )
+        if action in ExecutionAction.Trigger and self.execute_ is not None:
+            self.execute_()
 
 
 class DebugProvider(BaseProvider):
@@ -45,6 +58,23 @@ class DebugProvider(BaseProvider):
                 "Debug: Loading Line", IconLoadMethod(LoadMethod.loading), loading_line=True
             )
         )
+        choices.append(
+            DebugChoice(
+                "Debug: Add Prospero Startup", execute=lambda: task_schedule_handler.add_task(print)
+            )
+        )
+        choices.append(
+            DebugChoice(
+                "Debug: Query Prospero Startup",
+                execute=lambda: task_schedule_handler.query_task(print),
+            )
+        )
+        choices.append(
+            DebugChoice(
+                "Debug: Remove Prospero Startup",
+                execute=lambda: task_schedule_handler.remove_task(print),
+            )
+        )
 
         self._matcher: IncrementalMatcher[DebugChoice] = IncrementalMatcher(choices)
 
@@ -58,6 +88,7 @@ class DebugProvider(BaseProvider):
                 [],
                 icon_load_method=r.choice.icon,
                 loading_line=r.choice.loading_line,
+                execute_=r.choice.execute,
             )
             for r in res
         ]
@@ -68,10 +99,10 @@ class DebugProvider(BaseProvider):
     ) -> None:
 
         def _wrapper(arg: Collection[BaseResult] | LoadingRequest) -> None:
-            if not isinstance(arg, LoadingRequest):
+            if isinstance(arg, (list, tuple)) and arg:
                 try:
-                    last_arg = arg[0]
-                    if last_arg and isinstance(last_arg, DebugResult) and last_arg.loading_line:
+                    first_arg = arg[0]
+                    if first_arg and isinstance(first_arg, DebugResult) and first_arg.loading_line:
                         callback(self._loading_request)
                     else:
                         self._loading_request.remove()
