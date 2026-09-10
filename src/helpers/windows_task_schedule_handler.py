@@ -6,6 +6,7 @@ scheduled task that launches Prospero at user logon.
 """
 
 # NOTE: Avoid importing too much since this will be imported on --schtasks-handler mode.
+import atexit
 import logging
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, TypeVar
@@ -228,6 +229,10 @@ def _execute(func: Callable[[], TOutputVar], callback: Callable[[TOutputVar], No
 
 
 def stop_elevated_handler() -> bool:
+    if _key_and_port is None:
+        return True
+    if _client_connection is None:
+        return True
     con = _get_connection()
     con.send("exit")
     return con.recv()["ok"]  # pyright: ignore[reportAny]
@@ -243,6 +248,10 @@ def remove_task(callback: Callable[[bool], None]) -> None:
 
 def query_task(callback: Callable[[tuple[bool, str]], None]) -> None:
     _execute(_query_task, callback)
+
+
+# Register task_schedule_handler to request the elevated process to stop.
+_ = atexit.register(stop_elevated_handler)
 
 
 __all__ = [

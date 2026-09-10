@@ -81,7 +81,6 @@ def ui() -> None:
 
     import assets
     import constants
-    from helpers import task_schedule_handler
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
     from updater import Updater
@@ -113,9 +112,6 @@ def ui() -> None:
     # Set parent of Updater to window
     u = Updater()
     u.setParent(window)
-
-    # Register task_schedule_handler to request the other process to stop.
-    _ = atexit.register(task_schedule_handler.stop_elevated_handler)
 
     _ = app.exec()
 
