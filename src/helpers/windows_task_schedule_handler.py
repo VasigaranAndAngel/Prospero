@@ -22,7 +22,15 @@ def _run(args: Sequence[str]):
     """Run a schtasks command and return (success, output)."""
     import subprocess
 
-    result = subprocess.run(args, capture_output=True, text=True, shell=False)
+    result = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        shell=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     success = result.returncode == 0
     output = result.stdout if success else result.stderr
     return success, output.strip()
