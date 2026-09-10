@@ -47,7 +47,7 @@ def _add_task():
     # ]
     # fmt: on
     script = [
-        f'$action = New-ScheduledTaskAction -Execute "{APPLICATION_PATH}"',
+        f'$action = New-ScheduledTaskAction -Execute "{APPLICATION_PATH}" -WorkingDirectory "{APPLICATION_PATH.parent}"',
         "$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME",
         "$setting = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries",
         f'Register-ScheduledTask -TaskName "{_TASK_NAME}" -Action $action -Settings $setting -Trigger $trigger',
