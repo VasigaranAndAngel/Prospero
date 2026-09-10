@@ -3,10 +3,12 @@ import subprocess
 import sys
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Literal, overload, override
 
 from constants import APPLICATION_NAME
 from fuzzy_finder import BaseChoice, IncrementalMatcher
+from helpers import task_schedule_handler
 
 from .._base_provider import BaseProvider
 from ..base_result_and_widgets import BaseResult, BaseResultBoxWidget, ExecutionAction
@@ -93,6 +95,16 @@ _COMMANDS: dict[str, Command] = {
         "shell", "rundll32.exe user32.dll,LockWorkStation", "Locks the current user account"
     ),
     "Updater": Command(None, None, f"Update {APPLICATION_NAME.title()}", UpdaterResultWidget),
+    f"Add {APPLICATION_NAME.title()} to Scheduled Tasks": Command(
+        "func",
+        partial(task_schedule_handler.add_task, lambda x: None),
+        f"Adds {APPLICATION_NAME.title()} to scheduled tasks to start on current user log on.",
+    ),
+    f"Remove {APPLICATION_NAME.title()} from Scheduled Tasks": Command(
+        "func",
+        partial(task_schedule_handler.remove_task, lambda x: None),
+        f"Removes {APPLICATION_NAME.title()} from scheduled tasks.",
+    ),
 }
 
 

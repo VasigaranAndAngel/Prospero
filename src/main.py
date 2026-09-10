@@ -81,6 +81,7 @@ def ui() -> None:
 
     import assets
     import constants
+    from helpers import task_schedule_handler
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
     from updater import Updater
@@ -113,22 +114,56 @@ def ui() -> None:
     u = Updater()
     u.setParent(window)
 
+    # Register task_schedule_handler to request the other process to stop.
+    _ = atexit.register(task_schedule_handler.stop_elevated_handler)
+
     _ = app.exec()
 
 
 def main() -> None:
     import logging
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-    )
+    from constants import SCHTASKS_HANDLER_MODE
 
-    if "cli" in sys.argv:
-        cli()
+    _ = SCHTASKS_HANDLER_MODE
+
+    arg = "--schtasks-handler"
+    if arg in sys.argv:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s:%(levelname)s:%(name)s - %(message)s",
+            stream=open("schtasks-handler.log", "a"),
+        )
+        logger = logging.getLogger(__name__)
+
+        if len(sys.argv) > (idx := sys.argv.index(arg)) + 2:
+            SCHTASKS_HANDLER_MODE = True  # pyright: ignore[reportConstantRedefinition]
+            try:
+                from helpers import task_schedule_handler
+
+                logger.debug("Starting listener...")
+                _ = task_schedule_handler.start_listener(*sys.argv[idx + 1 : idx + 3])
+            except Exception as e:
+                logger.error(f"Error running TaskScheduleHandler: {e}")
+        else:
+            logger.error(
+                f"Authkey and port arguments are missing. NOTE: '{arg}' argument is only for internal uses."
+            )
+
     else:
-        ui()
+        from constants import APPLICATION_NAME as AN
+
+        stream = open(f"{AN.title()}.log", "a") if getattr(sys, "frozen", False) else sys.stdout
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s:%(levelname)s:%(name)s - %(message)s",
+            stream=stream,
+        )
+
+        if "cli" in sys.argv:
+            cli()
+        else:
+            ui()
 
 
 if __name__ == "__main__":
