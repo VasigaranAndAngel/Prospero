@@ -29,8 +29,6 @@ def _run(args: Sequence[str]):
         text=True,
         shell=True,
         creationflags=subprocess.CREATE_NO_WINDOW,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
     )
     success = result.returncode == 0
     output = result.stdout if success else result.stderr
