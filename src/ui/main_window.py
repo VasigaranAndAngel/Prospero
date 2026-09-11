@@ -68,7 +68,7 @@ class CornerMaskOverlay(QWidget):
             draw = self._radius > 0
 
         if draw:
-            rect = self.rect()
+            rect = self.rect().adjusted(0, 0, 1, 1)
             top_left_radius = a
             top_right_radius = b
             bottom_right_radius = c

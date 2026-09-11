@@ -2,16 +2,16 @@ from collections.abc import Callable
 from functools import partial
 from typing import override
 
-from PySide6.QtCore import QEasingCurve, QPointF, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QPointF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
     QHideEvent,
     QPainter,
     QPaintEvent,
+    QPalette,
     QPolygonF,
     QShowEvent,
-    Qt,
 )
 from PySide6.QtWidgets import QLineEdit, QWidget
 
@@ -53,6 +53,9 @@ class QueryBox(QLineEdit):
         self.setFont(font)
 
         self.setFrame(False)
+        pal = self.palette()
+        pal.setColor(QPalette.ColorRole.Base, "transparent")
+        self.setPalette(pal)
 
         _ = self._start_loading_anim.connect(self._next_frame)
 
