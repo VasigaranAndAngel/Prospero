@@ -52,7 +52,7 @@ class QueryBox(QLineEdit):
         font.setPointSize(int(font.pointSize() * 1.4))
         self.setFont(font)
 
-        self.setStyleSheet('QLineEdit {background: "transparent"; border: "transparent"}')
+        self.setFrame(False)
 
         _ = self._start_loading_anim.connect(self._next_frame)
 

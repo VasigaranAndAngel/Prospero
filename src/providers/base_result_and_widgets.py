@@ -12,7 +12,15 @@ from typing import override
 
 # TODO: This module will be imported on cli mode too. which imports unwanted PySide6
 from PySide6.QtCore import QEasingCurve, QMetaObject, QPropertyAnimation, Qt, Signal
-from PySide6.QtGui import QColor, QFocusEvent, QKeyEvent, QMouseEvent, QPainter, QPaintEvent
+from PySide6.QtGui import (
+    QColor,
+    QFocusEvent,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QPalette,
+)
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from data_objects import IconLoadMethod, LoadMethod
@@ -150,7 +158,11 @@ class ResultBox(BaseResultBoxWidget):
         font = name_label.font()
         font.setPointSize(int(font.pointSize() * 1.3))
         name_label.setFont(font)
-        info_label.setStyleSheet("QLabel {color: #b0ffffff}")
+        pal = info_label.palette()
+        col = pal.buttonText().color()
+        col.setAlphaF(0.9)
+        pal.setColor(QPalette.ColorRole.ButtonText, col)
+        info_label.setPalette(pal)
 
         self.set_description(self.description)
 

@@ -13,7 +13,7 @@ from PySide6.QtGui import (
     QPaintEvent,
     QResizeEvent,
 )
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
@@ -171,9 +171,8 @@ class MainWindow(QWidget):
 
         self._results_box: ResultsBox = ResultsBox(self)
         self._results_box.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._results_box.setStyleSheet(
-            "QScrollArea {background: 'transparent'; border: 'transparent'}"
-        )
+        self._results_box.setFrameShape(QFrame.Shape.NoFrame)
+        self._results_box.viewport().setAutoFillBackground(False)
         self._results_box.setWidget(wid := QWidget(self._results_box))
         self._results_box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         wid.setLayout(lay := CustomVBoxLayout(wid))
