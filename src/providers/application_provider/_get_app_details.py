@@ -100,7 +100,7 @@ def _build_full_app_list() -> list[AppDetail]:
     start_apps = _get_start_apps()
     logger.debug(f"start app retrieving took: {time.perf_counter() - t1}")
     t2 = time.perf_counter()
-    shortcuts = {s.Name: s for s in _get_shortcut_targets()}
+    shortcuts = _get_shortcut_targets()
     logger.debug(f"shortcuts retrieving took: {time.perf_counter() - t2}")
     t3 = time.perf_counter()
 
@@ -118,10 +118,10 @@ def _build_full_app_list() -> list[AppDetail]:
         )
 
     # all shortcut entries
-    for name, s in shortcuts.items():
+    for s in shortcuts:
         full_list.append(
             AppDetail(
-                app_name=name,
+                app_name=s.Name,
                 type="desktop",
                 path=s.LnkPath,
                 icon=s.icon_load_method,
