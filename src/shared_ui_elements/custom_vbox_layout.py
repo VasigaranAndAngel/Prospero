@@ -1,7 +1,6 @@
 from typing import override
 
 from PySide6.QtCore import (
-    QAbstractAnimation,
     QAnimationGroup,
     QEasingCurve,
     QParallelAnimationGroup,
@@ -12,11 +11,18 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 
 class CustomVBoxLayout(QVBoxLayout):
-    _group: QAnimationGroup | None = None
     animate: bool = True
     newly_added_widgets: list[QWidget] = []
     duration: int = 200
     easing_curve: QEasingCurve | QEasingCurve.Type = QEasingCurve.Type.OutExpo
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        if parent is None:
+            super().__init__()
+        else:
+            super().__init__(parent)
+
+        self._animation_group: QAnimationGroup = QParallelAnimationGroup(self)
 
     @override
     def setGeometry(self, arg__1: QRect, /) -> None:
@@ -42,14 +48,13 @@ class CustomVBoxLayout(QVBoxLayout):
                 widget.setGeometry(start)
 
         # stop/replace any animation already running.
-        if self._group is not None:
-            try:
-                self._group.stop()
-            except RuntimeError:
-                pass
-            self._group = None
+        self._animation_group.stop()
+        # self._group.clear()
+        while self._animation_group.animationCount():
+            anim = self._animation_group.animationAt(0)
+            self._animation_group.removeAnimation(anim)
+            anim.deleteLater()
 
-        group = QParallelAnimationGroup(self)
         any_moving = False
         for widget, target in targets.items():
             if widget in self.newly_added_widgets:
@@ -60,16 +65,14 @@ class CustomVBoxLayout(QVBoxLayout):
             if not start.isValid() or start == target:
                 widget.setGeometry(target)
                 continue
+
             anim = QPropertyAnimation(widget, b"geometry", widget)
             anim.setDuration(self.duration)
             anim.setEasingCurve(self.easing_curve)
             anim.setStartValue(start)
             anim.setEndValue(target)
-            group.addAnimation(anim)
+            self._animation_group.addAnimation(anim)
             any_moving = True
 
         if any_moving:
-            self._group = group
-            group.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
-        else:
-            self._group = None
+            self._animation_group.start()

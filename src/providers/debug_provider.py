@@ -75,6 +75,10 @@ class DebugProvider(BaseProvider):
                 execute=lambda: task_schedule_handler.remove_task(print),
             )
         )
+        choices.append(DebugChoice("Debug: Get first snapshot", execute=_get_first_snapshot))
+        choices.append(
+            DebugChoice("Debug: Compare with second snapshot", execute=_get_and_compare_snapshot)
+        )
 
         self._matcher: IncrementalMatcher[DebugChoice] = IncrementalMatcher(choices)
 
@@ -111,3 +115,26 @@ class DebugProvider(BaseProvider):
             callback(arg)
 
         return super().search_async(query, _wrapper)
+
+
+first_snapshot = None
+
+
+def _get_first_snapshot() -> None:
+    global first_snapshot
+    import tracemalloc
+
+    tracemalloc.start()
+    first_snapshot = tracemalloc.take_snapshot()
+
+
+def _get_and_compare_snapshot() -> None:
+    import tracemalloc
+
+    sec_snap = tracemalloc.take_snapshot()
+    com = sec_snap.compare_to(first_snapshot, "lineno")  # pyright: ignore[reportArgumentType]
+
+    print("\n" + "=" * 100)
+    for stat in com[:10]:
+        print(stat)
+        logger.debug(stat)
