@@ -28,4 +28,4 @@ def shutdown_respect_hybrid(force: bool = True):
     if force:
         cmd.append("/f")
 
-    _ = subprocess.run(cmd, check=True)
+    _ = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
