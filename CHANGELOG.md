@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.1.0-alpha.3 (2026-09-16)
+
+### Bug Fixes
+
+- Updater updates the into wrong dir.
+  ([`894ca71`](https://github.com/VasigaranAndAngel/Prospero/commit/894ca713beda27f7fb9e38fdacd682c5245e29e4))
+
+
 ## v0.1.0-alpha.2 (2026-09-16)
 
 ### Bug Fixes
