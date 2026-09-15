@@ -40,6 +40,13 @@ class ResultsBoxContainer(QWidget):
         self._old_size_hint: QSize = self.sizeHint()
 
     @override
+    def event(self, event: QEvent, /) -> bool:
+        res = super().event(event)
+        if event.type() == QEvent.Type.LayoutRequest:
+            self.adjustSize()
+        return res
+
+    @override
     def resizeEvent(self, event: QResizeEvent, /) -> None:
         super().resizeEvent(event)
         if self._old_size_hint != (x := self.sizeHint()):
