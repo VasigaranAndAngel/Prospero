@@ -15,7 +15,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import QApplication, QWidget
 
-from constants import APPLICATION_NAME, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
+from constants import APPLICATION_NAME, APPLICATION_PATH, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
 from helpers import SingletonQObjectMeta
 
 logger = logging.getLogger(__name__)
@@ -196,13 +196,10 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         cmd = [str(installer_path)]
 
         if getattr(sys, "frozen", False):
-            install_dir = getattr(sys, "_MEIPASS")  # pyright: ignore[reportAny]
-            if install_dir is None:
-                logger.warning("Not able to get the install dir.")
-            else:
-                cmd.append("/silent")
-                cmd.append("/autostart")
-                cmd.append(f"/dir={install_dir}")
+            install_dir = APPLICATION_PATH.parent
+            cmd.append("/silent")
+            cmd.append("/autostart")
+            cmd.append(f"/dir={install_dir}")
         else:
             cmd.append("/silent")
             cmd.append("/autostart")
