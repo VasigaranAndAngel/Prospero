@@ -104,6 +104,12 @@ class MainWindow(QWidget):
 
         self._result_box_container: ResultsBoxContainer = wid
 
+        self._results_scroll_anim: QPropertyAnimation = QPropertyAnimation(
+            self._results_box.verticalScrollBar(), b"value", self
+        )
+        self._results_scroll_anim.setDuration(250)
+        self._results_scroll_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -221,6 +227,13 @@ class MainWindow(QWidget):
         else:
             self._shadow_focused_idx = None
 
+        # Reset scroll area
+        # TODO: this will work most of the time but not when an old shadow focused widget is
+        # preserved
+        self._results_scroll_anim.stop()
+        self._results_scroll_anim.setEndValue(0)
+        self._results_scroll_anim.start()
+
         # raise the mask widget to the top
         self._corner_mask.raise_()
 
@@ -250,6 +263,44 @@ class MainWindow(QWidget):
                 self._shadow_focused_idx = len(self._result_boxes) - 1
 
         self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
+        self._scroll_results_if_needed()
+
+    def _scroll_results_if_needed(self) -> None:
+        if (sf_idx := self._shadow_focused_idx) is None:
+            return
+
+        vs = self._results_box.verticalScrollBar()
+        if not vs.minimum() < vs.maximum():
+            return  # ignore
+        vs_val = vs.value() / (vs.maximum() - vs.minimum())
+
+        # Get positions of result box and results_box(ScrollArea).
+        sf_geo = self._result_boxes[sf_idx].geometry()
+        rb_geo = self._results_box.geometry()
+        # Get view's top.
+        view_top = self._result_box_container.height() - rb_geo.height()
+        # Move results_box's geo to fit with actual view.
+        rb_geo.moveTop(int(0 + view_top * vs_val))
+
+        # Check if selected result box is top or bottom of view.
+        if sf_geo.top() < rb_geo.top():
+            diff = sf_geo.top() - rb_geo.top()
+        elif sf_geo.bottom() > rb_geo.bottom():
+            diff = sf_geo.bottom() - rb_geo.bottom()
+        else:
+            return
+
+        diff_ratio = diff / view_top
+        # vs.setValue(view_top * (vs_val + diff_ratio))
+        end_scroll_val = int(view_top * (vs_val + diff_ratio))
+
+        anim = self._results_scroll_anim
+        if anim.state() == QAbstractAnimation.State.Running and anim.endValue() == end_scroll_val:
+            return  # ignore
+
+        anim.stop()
+        anim.setEndValue(end_scroll_val)
+        anim.start()
 
     def _on_focus_request(self, widget: ResultBox) -> None:
         idx = self._result_boxes.index(widget)
