@@ -1,4 +1,4 @@
-from .custom_vbox_layout import CustomVBoxLayout
+from .custom_vbox_layout import AnimatedVBoxLayout
 from .icon import Icon
 
-__all__ = ["CustomVBoxLayout", "Icon"]
+__all__ = ["AnimatedVBoxLayout", "Icon"]

@@ -21,10 +21,10 @@ from PySide6.QtGui import (
     QPaintEvent,
     QPalette,
 )
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from data_objects import IconLoadMethod, LoadMethod
-from shared_ui_elements import CustomVBoxLayout, Icon
+from shared_ui_elements import Icon
 
 
 def _get_default_icon() -> "IconLoadMethod":
@@ -137,10 +137,9 @@ class ResultBox(BaseResultBoxWidget):
         icon.setFixedSize(40, 40)
         self._icon: Icon = icon
 
-        main_lay.addLayout(txt_lay := CustomVBoxLayout())
+        main_lay.addLayout(txt_lay := QVBoxLayout())
         txt_lay.setContentsMargins(0, 0, 0, 0)
         txt_lay.setSpacing(0)
-        txt_lay.duration = 500
         txt_lay.addWidget(name_label := QLabel(text, self), alignment=Qt.AlignmentFlag.AlignVCenter)
         txt_lay.addWidget(info_label := QLabel("", self), alignment=Qt.AlignmentFlag.AlignTop)
         info_label.hide()

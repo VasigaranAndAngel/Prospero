@@ -3,7 +3,17 @@ import logging
 from collections.abc import Collection
 from typing import Literal, cast, override
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtCore import (
+    QAbstractAnimation,
+    QEasingCurve,
+    QEvent,
+    QPoint,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QKeyEvent,
@@ -13,12 +23,12 @@ from PySide6.QtGui import (
     QPaintEvent,
     QResizeEvent,
 )
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
-from shared_ui_elements import CustomVBoxLayout
+from shared_ui_elements import AnimatedVBoxLayout
 from theme import theme
 from updater import GithubLatestRelease
 
@@ -133,6 +143,22 @@ class CornerMaskOverlay(QWidget):
                 painter.fillPath(corners_path, Qt.GlobalColor.transparent)
 
 
+class ResultsBoxContainer(QWidget):
+    size_hint_changed: Signal = Signal(QSize)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
+        self._old_size_hint: QSize = self.sizeHint()
+
+    @override
+    def resizeEvent(self, event: QResizeEvent, /) -> None:
+        super().resizeEvent(event)
+        if self._old_size_hint != (x := self.sizeHint()):
+            self._old_size_hint = x
+            self.size_hint_changed.emit(event.size())
+
+
 class MainWindow(QWidget):
     _result_update: Signal = Signal()
     "To update the results from the main thread."
@@ -173,11 +199,15 @@ class MainWindow(QWidget):
         self._results_box.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._results_box.setFrameShape(QFrame.Shape.NoFrame)
         self._results_box.viewport().setAutoFillBackground(False)
-        self._results_box.setWidget(wid := QWidget(self._results_box))
+        self._results_box.setWidget(wid := ResultsBoxContainer(self._results_box))
         self._results_box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        wid.setLayout(lay := CustomVBoxLayout(wid))
+        self._results_box.setWidgetResizable(True)
+        wid.setLayout(lay := AnimatedVBoxLayout(wid, 200, QEasingCurve.Type.OutExpo))
+        _ = wid.size_hint_changed.connect(self._update_size)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
+
+        self._result_box_container: ResultsBoxContainer = wid
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -226,44 +256,39 @@ class MainWindow(QWidget):
             self._result_update.emit()
 
     def _update_results_box(self) -> None:
-        self._result_boxes = []
-        widget = self._results_box.widget()
-        if widget is None:
-            raise Exception(
-                f"Not able to update results box since self._results_box.widget() is None unexpectedly."
-            )
-        layout = cast(CustomVBoxLayout | None, widget.layout())
+        self._result_boxes.clear()
+        widget = self._result_box_container
+        layout = cast(AnimatedVBoxLayout | None, widget.layout())
         if layout is None:
             raise Exception(
-                f"Not able to update results box since self._results_box.widget().layout() is None unexpectedly."
+                f"Not able to update results box since self._result_box_container.layout() is None unexpectedly."
             )
 
         # Preserve same hash results
         preserved: dict[int, BaseResultBoxWidget] = {}
         new_hashes = [hash(x) for x in self._current_results]
-        # calc_in_new = any([lambda x: x.name == "Calculation Provider" for x in self._current_results])
 
-        # Remove all old widgets.
-        while layout.count() > 0:
-            item = layout.itemAt(0)
+        # Remove old unwanted widgets.
+        n = 0
+        while layout.count() > n:
+            item = layout.itemAt(n)
             if item is None:
                 continue
-            wid = cast(
-                BaseResultBoxWidget | None, item.widget()
-            )  # type of child widgets are BaseResultBoxWidget
+            wid = cast(BaseResultBoxWidget | None, item.widget())
             if wid is None:
                 continue
-            layout.removeWidget(wid)
             # check hash for same result
             if (x := hash(wid.result)) in new_hashes:
                 preserved[x] = wid
+                n += 1
                 continue
+            layout.removeWidget(wid)
             # disconnect focus request connections
             if (con := wid.focus_request_connection) is not None:
                 _ = wid.focus_request.disconnect(con)
             wid.request_deletion()
 
-        # Add new widgets
+        # Prepare new widgets
         for res in self._current_results:
             if (x := hash(res)) in preserved:
                 res_box = preserved[x]
@@ -273,17 +298,16 @@ class MainWindow(QWidget):
                     res_box = wid_fac(res.result, res)
                 else:
                     res_box = ResultBox(res.result, res)
-                res_box.setFixedWidth(self.width())
-                layout.newly_added_widgets.append(res_box)
                 connection = res_box.focus_request.connect(self._on_focus_request)
                 res_box.focus_request_connection = connection
-            layout.addWidget(res_box)
-            res_box.show()
             self._result_boxes.append(res_box)
+
+        # Add new widgets
+        layout.setWidgets(self._result_boxes)
 
         # Set window's size
         widget.adjustSize()
-        self._update_size()
+        # self._update_size()
 
         # Remove old shadow focus
         for res_box in self._result_boxes:
@@ -448,18 +472,19 @@ class MainWindow(QWidget):
         src_s = self.screen().size()
         size = conf.window_geometry.size.get_size(src_s.width(), src_s.height())
         width = 0 if self._close else size[0]
-        rw = self._results_box.widget()
-        if rw is None:
-            raise Exception(
-                "Not able to update size since self._results_box.widget() is None unexpectedly."
-            )
-        height = min(rw.height() + self._query_box.height(), size[1])
+        rbc = self._result_box_container.sizeHint()
+        height = min(rbc.height() + self._query_box.height(), size[1])
 
-        if self.width() != width:
+        wa = self._width_anim
+        ha = self._height_anim
+        ignore_w = wa.state() == QAbstractAnimation.State.Running and wa.endValue() == width
+        ignore_h = ha.state() == QAbstractAnimation.State.Running and ha.endValue() == height
+
+        if self.width() != width and not ignore_w:
             self._width_anim.stop()
             self._width_anim.setEndValue(width)
             self._width_anim.start()
-        if self.height() != height:
+        if self.height() != height and not ignore_h:
             self._height_anim.stop()
             self._height_anim.setEndValue(height)
             self._height_anim.start()
@@ -496,6 +521,8 @@ class MainWindow(QWidget):
     def resizeEvent(self, event: QResizeEvent, /) -> None:
         super().resizeEvent(event)
         self._corner_mask.resize(event.size())
+        if (x := event.size().width()) != self._result_box_container.width():
+            self._result_box_container.setFixedWidth(x)
 
     @override
     def paintEvent(self, event: QPaintEvent, /) -> None:
