@@ -1,7 +1,7 @@
 import math
 import time
 from enum import Enum, auto
-from typing import override
+from typing import ClassVar, override
 
 from PySide6.QtCore import QEasingCurve, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
@@ -160,10 +160,12 @@ class _IconState(Enum):
 
 class Icon(QLabel):
     _image_loaded: Signal = Signal(object)
-    _instances: int = 0
+    _instances: ClassVar[int] = 0
     _icon_cache: dict[IconLoadMethod, tuple[QImage | None, float]] = {}
     """Cache data of the fetched icons.
-    dict[IconLoadMethod, tuple[<fetched icon if fetched>, <time of fetch>]]"""
+    dict[IconLoadMethod, tuple[<fetched icon if fetched>, <time of fetch>]]
+    TODO: check and remove old icons.
+    """
 
     def __init__(self, icon_load_method: IconLoadMethod, parent: QWidget | None = None) -> None:
         super().__init__()
@@ -246,6 +248,9 @@ class Icon(QLabel):
 
     def _reset_loading_frame(self) -> None:
         self._loading_frame = self._instance_no * -2 % self._loading_fps - 2  # to add variations
+
+    def load_method(self) -> IconLoadMethod:
+        return self._i_load_method
 
     def update_load_method(self, load_method: IconLoadMethod) -> None:
         self._i_load_method = load_method

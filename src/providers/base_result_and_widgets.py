@@ -104,6 +104,9 @@ class BaseResultBoxWidget(QWidget):
     def execute_execution_action(self, action: ExecutionAction) -> None:
         self.result.execute(action)
 
+    def update_result(self, new_result: BaseResult) -> None:
+        self.result = new_result
+
     @override
     def keyReleaseEvent(self, event: QKeyEvent, /) -> None:
         if event.key() == Qt.Key.Key_Return:
@@ -170,6 +173,20 @@ class ResultBox(BaseResultBoxWidget):
         self._back_color_anim.setDuration(400)
         self._back_color_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
         _ = self._back_color_anim.valueChanged.connect(self.repaint)
+
+    def _reflect_result(self) -> None:
+        "Will update everything according to result. Useful if the result is updated."
+        if self._icon.load_method() != self.result.icon_load_method:
+            self._icon.update_load_method(self.result.icon_load_method)
+        if self._name_widget.text() != self.result.result:
+            self._name_widget.setText(self.result.result)
+        if self._description_widget.text() != self.result.description:
+            self.set_description(self.result.description)
+        
+    @override
+    def update_result(self, new_result: BaseResult) -> None:
+        super().update_result(new_result)
+        self._reflect_result()
 
     @override
     def set_shadow_focus(self, focus: bool) -> None:

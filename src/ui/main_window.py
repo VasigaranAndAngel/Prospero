@@ -292,6 +292,7 @@ class MainWindow(QWidget):
         for res in self._current_results:
             if (x := hash(res)) in preserved:
                 res_box = preserved[x]
+                res_box.update_result(res)
             else:
                 wid_fac = res.result_widget_factory
                 if wid_fac is not None:
