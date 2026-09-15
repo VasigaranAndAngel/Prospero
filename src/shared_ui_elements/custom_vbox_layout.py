@@ -168,7 +168,6 @@ class AnimatedVBoxLayout(QLayout):
         y = r.y()
         w = r.width()
 
-        seen: set[QWidget] = set()
         for item in self._items:
             widget = item.widget()
             if widget is None:
@@ -177,7 +176,6 @@ class AnimatedVBoxLayout(QLayout):
             min_h = item.minimumSize().height()
             h = max(hint_h, min_h)
             target = QRect(x, y, w, h)
-            seen.add(widget)
             self._apply_target(widget, target)
             y += h + self.spacing()
 
