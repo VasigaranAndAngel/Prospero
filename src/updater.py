@@ -102,10 +102,14 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                 release = GithubLatestRelease.model_validate_json(data)
                 sent_to(release)
             except Exception as e:
-                logger.warning(f"Failed to fetch ({reply.url().toString()}) latest release from github: {e}")
+                logger.warning(
+                    f"Failed to fetch ({reply.url().toString()}) latest release from github: {e}"
+                )
                 sent_to(self.GithubFetchError())
         else:
-            logger.warning(f"Failed to fetch ({reply.url().toString()}) latest release from github: {reply.errorString()}")
+            logger.warning(
+                f"Failed to fetch ({reply.url().toString()}) latest release from github: {reply.errorString()}"
+            )
             sent_to(self.GithubFetchError())
 
     def get_latest_release(
@@ -131,13 +135,11 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         def _callback(release: "GithubLatestRelease | Updater.GithubFetchError") -> None:
             if isinstance(release, Updater.GithubFetchError):
                 self.update_checked.emit(release)
-            elif (
-                isinstance(release, Updater.GithubFetchError)
-                or release.get_version() > APPLICATION_VERSION
-            ):
+            elif release.get_version() > APPLICATION_VERSION:
                 logger.debug(f"Update available: {release.tag_name}")
                 self.update_checked.emit(release)
             else:
+                logger.debug(f"{APPLICATION_NAME.title()} is upto date.")
                 self.update_checked.emit(None)
 
         self.get_latest_release(_callback)
