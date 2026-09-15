@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.1.0-alpha.2 (2026-09-16)
+
+### Bug Fixes
+
+- QNetwork fails when checking for updates.
+  ([`eee7b8f`](https://github.com/VasigaranAndAngel/Prospero/commit/eee7b8ff4feafc026d0b1296e61ec9a81ebaee61))
+
+
 ## v0.1.0-alpha.1 (2026-09-15)
 
 ### Bug Fixes
