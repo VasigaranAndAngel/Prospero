@@ -32,10 +32,7 @@ class DebugResult(BaseResult):
 
     @override
     def execute(self, action: ExecutionAction) -> None:
-        logger.debug(
-            f"executed; {action in ExecutionAction.Trigger=}; {self.execute_ is not None=}"
-        )
-        if action in ExecutionAction.Trigger and self.execute_ is not None:
+        if action is ExecutionAction.Trigger and self.execute_ is not None:
             self.execute_()
 
 

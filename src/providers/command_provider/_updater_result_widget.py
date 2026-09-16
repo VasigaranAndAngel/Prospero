@@ -123,7 +123,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
 
     @override
     def execute_execution_action(self, action: ExecutionAction) -> None:
-        if action in ExecutionAction.Trigger:
+        if action is ExecutionAction.Trigger:
             if self._latest_release is None:
                 self._check_for_update()
             else:

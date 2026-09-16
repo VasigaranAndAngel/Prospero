@@ -148,7 +148,7 @@ class MainWindow(QWidget):
         new_results = tuple(
             sorted(
                 filter(lambda x: x.score > 0, self._current_results + tuple(res)),
-                key=lambda x: -x.score,
+                key=lambda x: (-x.score, x.result),
             )
         )
         if not self._current_results or self._current_results != new_results:

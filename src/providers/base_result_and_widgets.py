@@ -7,7 +7,7 @@ exported from providers.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import IntFlag, auto
+from enum import Enum, auto
 from typing import override
 
 # TODO: This module will be imported on cli mode too. which imports unwanted PySide6
@@ -31,11 +31,11 @@ def _get_default_icon() -> "IconLoadMethod":
     return IconLoadMethod(LoadMethod.default)
 
 
-class ExecutionAction(IntFlag):
-    Enter = auto()
-    DoubleClick = auto()
-
-    Trigger = Enter | DoubleClick
+class ExecutionAction(Enum):
+    Trigger = auto()
+    "The main trigger from KeyPress Enter or Mouse DoubleClick."
+    Expand = auto()
+    "More options trigger which tells the ResultBox to show more options/contexts."
 
 
 @dataclass
@@ -110,7 +110,7 @@ class BaseResultBoxWidget(QWidget):
     @override
     def keyReleaseEvent(self, event: QKeyEvent, /) -> None:
         if event.key() == Qt.Key.Key_Return:
-            self.execute_execution_action(ExecutionAction.Enter)
+            self.execute_execution_action(ExecutionAction.Trigger)
             event.accept()
             return
         return super().keyReleaseEvent(event)
@@ -122,7 +122,7 @@ class BaseResultBoxWidget(QWidget):
 
     @override
     def mouseDoubleClickEvent(self, event: QMouseEvent, /) -> None:
-        self.execute_execution_action(ExecutionAction.DoubleClick)
+        self.execute_execution_action(ExecutionAction.Trigger)
         event.accept()
 
 
@@ -182,7 +182,7 @@ class ResultBox(BaseResultBoxWidget):
             self._name_widget.setText(self.result.result)
         if self._description_widget.text() != self.result.description:
             self.set_description(self.result.description)
-        
+
     @override
     def update_result(self, new_result: BaseResult) -> None:
         super().update_result(new_result)

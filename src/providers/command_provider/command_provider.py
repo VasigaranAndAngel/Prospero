@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Literal, overload, override
 
-from constants import APPLICATION_NAME
+from constants import APPLICATION_NAME, VERSION
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 from helpers import task_schedule_handler
 
@@ -105,6 +105,7 @@ _COMMANDS: dict[str, Command] = {
         partial(task_schedule_handler.remove_task, lambda x: None),
         f"Removes {APPLICATION_NAME.title()} from scheduled tasks.",
     ),
+    "Version": Command(None, None, f"Current version of {APPLICATION_NAME.title()} is {VERSION}"),
 }
 
 
@@ -114,7 +115,7 @@ class CommandResult(BaseResult):
 
     @override
     def execute(self, action: ExecutionAction) -> None:
-        if action in ExecutionAction.Trigger and self.func is not None:
+        if action is ExecutionAction.Trigger and self.func is not None:
             self.func()
 
     @override

@@ -49,7 +49,7 @@ def cli() -> None:
                 break
             case "\r":
                 if first_res is not None:
-                    first_res.execute(ExecutionAction.Enter)
+                    first_res.execute(ExecutionAction.Trigger)
                 continue
             case "\x08":
                 query_buffer = query_buffer[:-1]

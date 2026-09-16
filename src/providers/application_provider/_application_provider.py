@@ -53,10 +53,11 @@ class AppResult(BaseResult):
     @override
     def execute(self, action: ExecutionAction) -> None:
         # os.startfile(self.start)
-        logger.debug(f"Launching: {self.command}")
-        _ = subprocess.Popen(
-            self.command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True
-        )
+        if action is ExecutionAction.Trigger:
+            logger.debug(f"Launching: {self.command}")
+            _ = subprocess.Popen(
+                self.command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True
+            )
 
     @override
     def __hash__(self) -> int:
