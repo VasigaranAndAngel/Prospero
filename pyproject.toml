@@ -43,8 +43,13 @@ version-file = "src/_version.py"
 pythonpath = ["src"]
 addopts = ["-s"]
 
+[tool.basedpyright]
+reportImportCycles = "information"
+reportUnusedImport = "none"        # removed because ruff handles it
+
 [tool.ruff]
-select = ["I"]
+select = ["I", "F"]
+ignore = ["PLR0402"]
 line-length = 100
 
 [tool.pyrefly]
