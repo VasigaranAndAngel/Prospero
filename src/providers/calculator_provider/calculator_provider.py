@@ -13,12 +13,12 @@ class CalcResult(BaseResult):
             try:
                 import pyperclip  # if pyperclip is available, use it.
 
-                pyperclip.copy(self.result)
+                pyperclip.copy(self.text)
             except ImportError:
                 # Importing PySide6 here so it will not imported when launching in cli mode
                 from PySide6.QtGui import QGuiApplication
 
-                QGuiApplication.clipboard().setText(self.result)
+                QGuiApplication.clipboard().setText(self.text)
 
 
 class CalcProvider(BaseProvider):
@@ -30,7 +30,7 @@ class CalcProvider(BaseProvider):
         try:
             if query.strip():
                 res = evaluator(query)
-                return [CalcResult(str(res), 1000, [], None)]
+                return [CalcResult(text=str(res), score=1000)]
             else:
                 return []
         except ArithmeticEvalError:

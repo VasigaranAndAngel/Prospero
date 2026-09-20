@@ -148,7 +148,7 @@ class MainWindow(QWidget):
         new_results = tuple(
             sorted(
                 filter(lambda x: x.score > 0, self._current_results + tuple(res)),
-                key=lambda x: (-x.score, x.result),
+                key=lambda x: (-x.score, x.text),
             )
         )
         if not self._current_results or self._current_results != new_results:
@@ -162,7 +162,7 @@ class MainWindow(QWidget):
         layout = cast(AnimatedVBoxLayout | None, widget.layout())
         if layout is None:
             raise Exception(
-                f"Not able to update results box since self._result_box_container.layout() is None unexpectedly."
+                "Not able to update results box since self._result_box_container.layout() is None unexpectedly."
             )
 
         # Preserve same hash results
@@ -197,9 +197,9 @@ class MainWindow(QWidget):
             else:
                 wid_fac = res.result_widget_factory
                 if wid_fac is not None:
-                    res_box = wid_fac(res.result, res)
+                    res_box = wid_fac(res.text, res)
                 else:
-                    res_box = ResultBox(res.result, res)
+                    res_box = ResultBox(res.text, res)
                 connection = res_box.focus_request.connect(self._on_focus_request)
                 res_box.focus_request_connection = connection
             self._result_boxes.append(res_box)

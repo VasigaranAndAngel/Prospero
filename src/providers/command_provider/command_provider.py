@@ -109,8 +109,8 @@ _COMMANDS: dict[str, Command] = {
 }
 
 
-@dataclass
-class CommandResult(BaseResult):
+@dataclass(kw_only=True)
+class CommandResult(BaseResult, BaseChoice):
     func: Callable[[], None] | None = None
 
     @override
@@ -123,35 +123,21 @@ class CommandResult(BaseResult):
         return super().__hash__()
 
 
-@dataclass
-class CommandChoice(BaseChoice):
-    func: Callable[[], None] | None
-    description: str
-    result_widget_factory: Callable[[str, BaseResult], BaseResultBoxWidget] | None = None
-
-
 class CommandProvider(BaseProvider):
     def __init__(self) -> None:
         super().__init__("Command Provider")
-        self._matcher: IncrementalMatcher[CommandChoice] = IncrementalMatcher([], 5)
-        self._matcher.update_choices(
-            [
-                CommandChoice(name, command, command.description, command.result_widget_factory)
-                for name, command in _COMMANDS.items()
-            ]
-        )
+        self._matcher: IncrementalMatcher[CommandResult] = IncrementalMatcher([], 5)
+        choices = [
+            CommandResult(
+                text=name,
+                description=command.description,
+                result_widget_factory=command.result_widget_factory,
+                func=command,
+            )
+            for name, command in _COMMANDS.items()
+        ]
+        self._matcher.update_choices(choices)
 
     @override
     def search(self, query: str) -> Collection[CommandResult]:
-        results = self._matcher.search(query)
-        return [
-            CommandResult(
-                res.choice.text,
-                res.score,
-                res.positions,
-                res.choice.description,
-                result_widget_factory=res.choice.result_widget_factory,
-                func=res.choice.func,
-            )
-            for res in results
-        ]
+        return self._matcher.search(query)

@@ -28,7 +28,7 @@ Speed strategy:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import Protocol
 
 SCORE_MATCH = 16
 SCORE_GAP_EXTENSION = 1
@@ -41,9 +41,10 @@ EXACT_MATCH = 20  # exact full string match
 NEG_INF = float("-inf")
 
 
-@dataclass
-class BaseChoice:
+class BaseChoice(Protocol):
     text: str
+    score: int
+    highlighted_indexes: list[int]
 
 
 def _char_class(c: str) -> str:
@@ -162,22 +163,6 @@ def fuzzy_match(
     return int(best_score), positions
 
 
-@dataclass
-class Match[T_CHOICE: BaseChoice]:
-    index: int
-    choice: T_CHOICE
-    score: int
-    positions: list[int]
-
-    def highlighted(self, open_tag: str = "**", close_tag: str = "**") -> str:
-        """Wrap matched characters, e.g. for bolding in a UI."""
-        pos = set(self.positions)
-        out: list[str] = []
-        for i, ch in enumerate(self.choice.text):
-            out.append(f"{open_tag}{ch}{close_tag}" if i in pos else ch)
-        return "".join(out)
-
-
 class IncrementalMatcher[T_CHOICE: BaseChoice]:
     """Holds a fixed choice list and serves fast, incremental fuzzy search as
     the user types letter by letter — call `.search()` on every keystroke."""
@@ -202,13 +187,11 @@ class IncrementalMatcher[T_CHOICE: BaseChoice]:
         self._last_query = ""
         self._candidates = list(range(len(self.choices)))
 
-    def search(self, query: str) -> list[Match[T_CHOICE]]:
+    def search(self, query: str) -> list[T_CHOICE]:
         if not query:
             self._last_query = ""
             self._candidates = list(range(len(self.choices)))
-            return [
-                Match(i, self.choices[i], 0, []) for i in range(min(self.limit, len(self.choices)))
-            ]
+            return []
 
         query_lower = query.lower()
 
@@ -221,14 +204,18 @@ class IncrementalMatcher[T_CHOICE: BaseChoice]:
         else:
             pool = range(len(self.choices))
 
-        results: list[Match[T_CHOICE]] = []
+        results: list[T_CHOICE] = []
         survivors: list[int] = []
         for i in pool:
             m = fuzzy_match(query_lower, self.choices[i].text, self._lower[i], self._bonus[i])
             if m is not None:
                 score, positions = m
                 survivors.append(i)
-                results.append(Match(i, self.choices[i], score, positions))
+                choice = self.choices[i]
+                choice.score = score
+                choice.highlighted_indexes.clear()
+                choice.highlighted_indexes.extend(positions)
+                results.append(choice)
 
         self._candidates = survivors
         self._last_query = query

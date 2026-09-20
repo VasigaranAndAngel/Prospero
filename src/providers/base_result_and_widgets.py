@@ -5,6 +5,7 @@ decision is to put all related codes in same file. Now BaseResultBoxWidget and R
 exported from providers.
 """
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -27,10 +28,6 @@ from data_objects import IconLoadMethod, LoadMethod
 from shared_ui_elements import Icon
 
 
-def _get_default_icon() -> "IconLoadMethod":
-    return IconLoadMethod(LoadMethod.default)
-
-
 class ExecutionAction(Enum):
     Trigger = auto()
     "The main trigger from KeyPress Enter or Mouse DoubleClick."
@@ -49,28 +46,29 @@ class ResultAttributes:
     close_after_enter: bool = False
 
 
-@dataclass
-class BaseResult:
-    result: str
-    score: int
-    highlighted_indexes: list[int]
+@dataclass(kw_only=True)
+class BaseResult(ABC):
+    text: str
+    score: int = 0
+    highlighted_indexes: list[int] = field(default_factory=list)
     description: str | None = None
     attributes: ResultAttributes = field(default_factory=ResultAttributes)
-    icon_load_method: IconLoadMethod = field(default_factory=_get_default_icon)
+    icon_load_method: IconLoadMethod = IconLoadMethod(LoadMethod.default)
     result_widget_factory: Callable[[str, "BaseResult"], "BaseResultBoxWidget"] | None = None
 
     def highlighted(self, open_tag: str = "**", close_tag: str = "**") -> str:
         ih = set(self.highlighted_indexes)
         return "".join(
-            [f"{open_tag}{c}{close_tag}" if i in ih else f"{c}" for i, c in enumerate(self.result)]
+            [f"{open_tag}{c}{close_tag}" if i in ih else f"{c}" for i, c in enumerate(self.text)]
         )
 
-    def execute(self, action: ExecutionAction) -> None:  # pyright: ignore[reportUnusedParameter]
+    @abstractmethod
+    def execute(self, action: ExecutionAction) -> None:
         raise NotImplementedError
 
     @override
     def __hash__(self) -> int:
-        return hash(self.result + (self.description or ""))
+        return hash(self.text + (self.description or ""))
 
 
 class BaseResultBoxWidget(QWidget):
@@ -178,8 +176,8 @@ class ResultBox(BaseResultBoxWidget):
         "Will update everything according to result. Useful if the result is updated."
         if self._icon.load_method() != self.result.icon_load_method:
             self._icon.update_load_method(self.result.icon_load_method)
-        if self._name_widget.text() != self.result.result:
-            self._name_widget.setText(self.result.result)
+        if self._name_widget.text() != self.result.text:
+            self._name_widget.setText(self.result.text)
         if self._description_widget.text() != self.result.description:
             self.set_description(self.result.description)
 

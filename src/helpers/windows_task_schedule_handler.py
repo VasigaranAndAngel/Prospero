@@ -164,7 +164,7 @@ def launch_elevated_handler():
 
     params += f"--schtasks-handler {authkey} {port}"
 
-    logger.debug(f"Launching elevated application...")
+    logger.debug("Launching elevated application...")
     result = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe_path, params, None, 0)  # pyright: ignore[reportAny]
     if result <= 32:
         raise OSError(f"Elevation failed or was denied, code {result}")

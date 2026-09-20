@@ -15,14 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class DebugChoice(BaseChoice):
-    icon: IconLoadMethod = IconLoadMethod(LoadMethod.default)
-    loading_line: bool = False
-    execute: Callable[[], None] | None = None
-
-
-@dataclass
-class DebugResult(BaseResult):
+class DebugResult(BaseResult, BaseChoice):
     loading_line: bool = False
     execute_: Callable[[], None] | None = None
 
@@ -42,58 +35,63 @@ class DebugProvider(BaseProvider):
 
         self._loading_request: LoadingRequest = LoadingRequest(100)
 
-        choices: list[DebugChoice] = []
+        choices: list[DebugResult] = []
         for i in range(10):
             choices.append(
-                DebugChoice(f"Debug: Loading Icon {i}", IconLoadMethod(LoadMethod.loading))
+                DebugResult(
+                    text=f"Debug: Loading Icon {i}",
+                    icon_load_method=IconLoadMethod(LoadMethod.loading),
+                )
             )
 
-        choices.append(DebugChoice("Debug: Loading Icon", IconLoadMethod(LoadMethod.loading)))
-        choices.append(DebugChoice("Debug: Default Icon", IconLoadMethod(LoadMethod.loading)))
         choices.append(
-            DebugChoice(
-                "Debug: Loading Line", IconLoadMethod(LoadMethod.loading), loading_line=True
+            DebugResult(
+                text="Debug: Loading Icon", icon_load_method=IconLoadMethod(LoadMethod.loading)
             )
         )
         choices.append(
-            DebugChoice(
-                "Debug: Add Prospero Startup", execute=lambda: task_schedule_handler.add_task(print)
+            DebugResult(
+                text="Debug: Default Icon", icon_load_method=IconLoadMethod(LoadMethod.loading)
             )
         )
         choices.append(
-            DebugChoice(
-                "Debug: Query Prospero Startup",
-                execute=lambda: task_schedule_handler.query_task(print),
+            DebugResult(
+                text="Debug: Loading Line",
+                icon_load_method=IconLoadMethod(LoadMethod.loading),
+                loading_line=True,
             )
         )
         choices.append(
-            DebugChoice(
-                "Debug: Remove Prospero Startup",
-                execute=lambda: task_schedule_handler.remove_task(print),
+            DebugResult(
+                text="Debug: Add Prospero Startup",
+                execute_=lambda: task_schedule_handler.add_task(print),
             )
         )
-        choices.append(DebugChoice("Debug: Get first snapshot", execute=_get_first_snapshot))
         choices.append(
-            DebugChoice("Debug: Compare with second snapshot", execute=_get_and_compare_snapshot)
+            DebugResult(
+                text="Debug: Query Prospero Startup",
+                execute_=lambda: task_schedule_handler.query_task(print),
+            )
+        )
+        choices.append(
+            DebugResult(
+                text="Debug: Remove Prospero Startup",
+                execute_=lambda: task_schedule_handler.remove_task(print),
+            )
+        )
+        choices.append(DebugResult(text="Debug: Get first snapshot", execute_=_get_first_snapshot))
+        choices.append(
+            DebugResult(
+                text="Debug: Compare with second snapshot", execute_=_get_and_compare_snapshot
+            )
         )
 
         choices.extend(_prepare_provider_switch_command_choices())
-        self._matcher: IncrementalMatcher[DebugChoice] = IncrementalMatcher(choices)
+        self._matcher: IncrementalMatcher[DebugResult] = IncrementalMatcher(choices)
 
     @override
     def search(self, query: str) -> Collection[DebugResult]:
-        res = self._matcher.search(query)
-        return [
-            DebugResult(
-                r.choice.text,
-                r.score,
-                [],
-                icon_load_method=r.choice.icon,
-                loading_line=r.choice.loading_line,
-                execute_=r.choice.execute,
-            )
-            for r in res
-        ]
+        return self._matcher.search(query)
 
     @override
     def search_async(
@@ -138,18 +136,18 @@ def _get_and_compare_snapshot() -> None:
         logger.debug(stat)
 
 
-def _prepare_provider_switch_command_choices() -> list[DebugChoice]:
+def _prepare_provider_switch_command_choices() -> list[DebugResult]:
     from functools import partial
 
     from providers import PROVIDERS
 
-    choices: list[DebugChoice] = []
+    choices: list[DebugResult] = []
     for p in PROVIDERS:
         for ed, func in ("enable", _enable_provider), ("disable", _disable_provider):
             choices.append(
-                DebugChoice(
-                    f"{ed.title()} Provider: " + p.__name__,
-                    execute=partial(func, p.__name__),
+                DebugResult(
+                    text=f"{ed.title()} Provider: " + p.__name__,
+                    execute_=partial(func, p.__name__),
                 )
             )
     return choices

@@ -91,7 +91,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
 
     def _update_name_and_description(self) -> None:
         if self._latest_release is None:
-            self.set_name(f"Check for update")
+            self.set_name("Check for update")
             self.set_description(f"Checks if new version of {APPLICATION_NAME.title()} available.")
         else:
             self.set_name(f"Update {APPLICATION_NAME.title()}")

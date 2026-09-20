@@ -4,51 +4,24 @@ from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Literal, override
+from typing import override
 
-from data_objects import IconLoadMethod
+from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
 from .._loading_request import LoadingRequest
-from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultAttributes
+from ..base_result_and_widgets import BaseResult, ExecutionAction
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AppChoice(BaseChoice):
-    app_id_or_path: str | Path
-    type: Literal["uwp", "desktop", "unknown"] | None
-    icon_load_method: IconLoadMethod | None
-
-    @override
-    def __hash__(self) -> int:
-        return hash(self.text + str(self.app_id_or_path))
-
-
-@dataclass
-class AppResult(BaseResult):
-    def __init__(
-        self,
-        result: str,
-        command: str | Sequence[str],
-        score: int,
-        highlighted_indexes: list[int],
-        description: str | None,
-        icon_load_method: IconLoadMethod | None,
-    ) -> None:
-        attrs = ResultAttributes(close_after_enter=True)
-        if icon_load_method is None:
-            super().__init__(result, score, highlighted_indexes, description, attrs)
-        else:
-            super().__init__(
-                result, score, highlighted_indexes, description, attrs, icon_load_method
-            )
-
-        self.command: str | Sequence[str] = command
-        "Command that will be sent to the subprocess.Popen."
+@dataclass(kw_only=True)
+class AppResult(BaseResult, BaseChoice):
+    command: str | Sequence[str] = ""
+    "Command that will be sent to the subprocess.Popen."
+    description: str | None = None
 
     @override
     def execute(self, action: ExecutionAction) -> None:
@@ -61,7 +34,7 @@ class AppResult(BaseResult):
 
     @override
     def __hash__(self) -> int:
-        return hash(self.result + str(self.command))
+        return hash(self.text + str(self.command))
 
 
 class AppProvider(BaseProvider):
@@ -76,44 +49,38 @@ class AppProvider(BaseProvider):
         self._loading_request_sent: bool = False
         "Whether the LoadingRequest instance is sent to UI or not."
 
-        self.matcher: IncrementalMatcher[AppChoice] = IncrementalMatcher([], 5)
+        self.matcher: IncrementalMatcher[AppResult] = IncrementalMatcher([], 5)
         self.app_details: AppDetailsFetcher = AppDetailsFetcher(self._update_choices)
         self.app_details.start()
 
     def _update_choices(self, details: list[AppDetail]) -> None:
         self._fetching_app_details = False
-        self.matcher.update_choices(
-            [
-                AppChoice(
-                    a.app_name or "",
-                    a.path or Path() if a.type != "uwp" else a.app_id or "",
-                    a.type,
-                    a.icon,
-                )
-                for a in details
-            ]
-        )
+
+        choices: list[AppResult] = []
+        for d in details:
+            if d.type == "uwp":
+                path_or_app_id = d.app_id
+                command = f"start shell:appsFolder\\{path_or_app_id or ''}"
+            elif d.type == "desktop":
+                path_or_app_id = d.path
+                command = f'start "" "{path_or_app_id or Path()}"'
+            else:
+                continue
+            res = AppResult(
+                text=d.app_name or "",
+                command=command,
+                description=str(path_or_app_id),
+                icon_load_method=d.icon or IconLoadMethod(LoadMethod.default),
+            )
+            choices.append(res)
+
+        self.matcher.update_choices(choices)
         if self._call_after_fetching is not None:
             self._call_after_fetching()
 
     @override
     def search(self, query: str) -> Collection[AppResult]:
-        res = self.matcher.search(query)
-        return list(
-            map(
-                lambda x: AppResult(
-                    x.choice.text,
-                    f'start "" "{_p.as_posix()}"'
-                    if isinstance((_p := x.choice.app_id_or_path), Path) and x.choice.type != "uwp"
-                    else f"start shell:appsFolder\\{_p}",  # NOTE: Assuming the str is App ID
-                    x.score,
-                    x.positions,
-                    str(x.choice.app_id_or_path),
-                    x.choice.icon_load_method,
-                ),
-                res,
-            )
-        )
+        return self.matcher.search(query)
 
     @override
     def search_async(
