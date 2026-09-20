@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection
+from typing import override
 
 from global_threading import THREAD_POOL
 
@@ -28,3 +29,19 @@ class BaseProvider(ABC):
             callback (Callable): Callable to be call with results.
         """
         _ = THREAD_POOL.apply_async(self._search_async, (query, callback))
+
+    def enable_hook(self) -> None:
+        "Override this to be called after provider enabled."
+        pass
+
+    def disable_hook(self) -> None:
+        "Override this to be called when provider is about to disable."
+        pass
+
+    @override
+    def __repr__(self) -> str:
+        return self.__str__() + f" ({type(self)})"
+
+    @override
+    def __str__(self) -> str:
+        return f"Provider: {self.name}"

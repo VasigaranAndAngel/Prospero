@@ -77,6 +77,7 @@ class DebugProvider(BaseProvider):
             DebugChoice("Debug: Compare with second snapshot", execute=_get_and_compare_snapshot)
         )
 
+        choices.extend(_prepare_provider_switch_command_choices())
         self._matcher: IncrementalMatcher[DebugChoice] = IncrementalMatcher(choices)
 
     @override
@@ -135,3 +136,32 @@ def _get_and_compare_snapshot() -> None:
     for stat in com[:10]:
         print(stat)
         logger.debug(stat)
+
+
+def _prepare_provider_switch_command_choices() -> list[DebugChoice]:
+    from functools import partial
+
+    from providers import PROVIDERS
+
+    choices: list[DebugChoice] = []
+    for p in PROVIDERS:
+        for ed, func in ("enable", _enable_provider), ("disable", _disable_provider):
+            choices.append(
+                DebugChoice(
+                    f"{ed.title()} Provider: " + p.__name__,
+                    execute=partial(func, p.__name__),
+                )
+            )
+    return choices
+
+
+def _disable_provider(provider: str) -> None:
+    from providers import disable_provider
+
+    disable_provider(provider)
+
+
+def _enable_provider(provider: str) -> None:
+    from providers import enable_provider
+
+    enable_provider(provider)

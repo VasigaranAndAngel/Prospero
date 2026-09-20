@@ -137,3 +137,9 @@ class AppProvider(BaseProvider):
             self._call_after_fetching = partial(super().search_async, query, _wrapper)
         else:
             return super().search_async(query, callback)
+
+    @override
+    def disable_hook(self) -> None:
+        if self.app_details.is_alive():
+            self.app_details.join()
+        return super().disable_hook()

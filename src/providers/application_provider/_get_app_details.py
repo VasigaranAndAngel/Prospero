@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
-from typing import Literal
+from typing import Literal, override
 
 from pydantic import BaseModel
 
@@ -135,11 +135,11 @@ def _build_full_app_list() -> list[AppDetail]:
 
 class AppDetailsFetcher(Thread):
     def __init__(self, callback: Callable[[list[AppDetail]], None]) -> None:
-        super().__init__(target=self.get_app_list)
-        # self._app_list: list[AppDetail]
+        super().__init__()
         self._callback: Callable[[list[AppDetail]], None] = callback
 
-    def get_app_list(self) -> None:
+    @override
+    def run(self) -> None:
         """Retrieves details of apps and included shortcuts and \
         calls given callback with detail list.
 
