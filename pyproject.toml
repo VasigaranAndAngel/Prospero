@@ -48,8 +48,8 @@ reportImportCycles = "information"
 reportUnusedImport = "none"        # removed because ruff handles it
 
 [tool.ruff]
-select = ["I", "F"]
-ignore = ["PLR0402"]
+lint.select = ["I", "F"]
+lint.ignore = ["PLR0402"]
 line-length = 100
 
 [tool.pyrefly]
