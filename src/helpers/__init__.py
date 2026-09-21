@@ -1,8 +1,8 @@
-from constants import SCHTASKS_HANDLER_MODE
+from arg_parser import args
 
 from . import windows_task_schedule_handler as task_schedule_handler
 
-if not SCHTASKS_HANDLER_MODE:
+if args.schtasks_handler is None:
     from ._fetch_icon import fetch_icon, fetch_windows_app_icon
     from .singleton_meta import SingletonMeta, SingletonQObjectMeta
 

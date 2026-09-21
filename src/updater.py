@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import QApplication, QWidget
 
+from arg_parser import args
 from constants import APPLICATION_NAME, APPLICATION_PATH, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
 from helpers import SingletonQObjectMeta
 
@@ -115,12 +116,19 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
     def get_latest_release(
         self, callback: Callable[[GithubLatestRelease | GithubFetchError], None]
     ) -> None:
+        if args.offline:
+            # NOTE: temporary solution for block the internet. Internet should be blocked globally.
+            logger.warning("Application running in offline mode. Can't connect to internet.")
+            callback(
+                Updater.GithubFetchError(
+                    "Application running in offline mode. Can't connect to internet."
+                )
+            )
+            return
         logger.debug("Fetching github for latest release.")
-        if (
-            "update-domain" in sys.argv
-            and len(sys.argv) > (x := sys.argv.index("update-domain")) + 1
-        ):
-            domain = sys.argv[x + 1]
+        update_domain = args.update_domain
+        if update_domain is not None:
+            domain = update_domain[0]
             logger.debug(f"Fetching from custom domain: '{domain}'")
         else:
             domain = "https://api.github.com"

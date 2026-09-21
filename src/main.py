@@ -119,44 +119,43 @@ def ui() -> None:
 def main() -> None:
     import logging
 
-    from constants import SCHTASKS_HANDLER_MODE
+    from arg_parser import args
 
-    _ = SCHTASKS_HANDLER_MODE
-
-    arg = "--schtasks-handler"
-    if arg in sys.argv:
+    schtasks_handler = args.schtasks_handler
+    if schtasks_handler is not None:
+        stream = open("schtasks-handler.log", "a")
+        _ = atexit.register(stream.close)
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s:%(levelname)s:%(name)s - %(message)s",
-            stream=open("schtasks-handler.log", "a"),
+            stream=stream,
         )
         logger = logging.getLogger(__name__)
 
-        if len(sys.argv) > (idx := sys.argv.index(arg)) + 2:
-            SCHTASKS_HANDLER_MODE = True  # pyright: ignore[reportConstantRedefinition]
-            try:
-                from helpers import task_schedule_handler
+        try:
+            from helpers import task_schedule_handler
 
-                logger.debug("Starting listener...")
-                _ = task_schedule_handler.start_listener(*sys.argv[idx + 1 : idx + 3])
-            except Exception as e:
-                logger.error(f"Error running TaskScheduleHandler: {e}")
-        else:
-            logger.error(
-                f"Authkey and port arguments are missing. NOTE: '{arg}' argument is only for internal uses."
-            )
+            logger.debug("Starting listener...")
+            _ = task_schedule_handler.start_listener(schtasks_handler[0], schtasks_handler[1])
+        except Exception as e:
+            logger.error(f"Error running TaskScheduleHandler: {e}")
 
     else:
         from constants import APPLICATION_NAME as AN
 
-        stream = open(f"{AN.title()}.log", "a") if getattr(sys, "frozen", False) else sys.stdout
+        if getattr(sys, "frozen", False):
+            stream = open(f"{AN.title()}.log", "a")
+            _ = atexit.register(stream.close)
+        else:
+            stream = sys.stdout
+
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s:%(levelname)s:%(name)s - %(message)s",
             stream=stream,
         )
 
-        if "cli" in sys.argv:
+        if args.cli:
             cli()
         else:
             ui()

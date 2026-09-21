@@ -44,7 +44,6 @@ try:
 except AttributeError:
     _as_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0  # pyright: ignore[reportAny]
 RUNNING_AS_ADMIN: bool = _as_admin
-SCHTASKS_HANDLER_MODE: bool = False
 
 __all__ = [
     "APPLICATION_NAME",

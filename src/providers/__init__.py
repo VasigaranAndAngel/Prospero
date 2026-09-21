@@ -8,8 +8,9 @@ instances are only for show in UI. They are not treated as id.
 """
 
 import logging
-import sys
 from collections.abc import Callable, Collection
+
+from arg_parser import args
 
 from ._base_provider import BaseProvider
 from ._loading_request import LoadingRequest
@@ -28,7 +29,7 @@ from .debug_provider import DebugProvider
 logger = logging.getLogger(__name__)
 
 # TODO: get enabled providers list from config and setup according to it.
-DISABLED_PROVIDERS: list[type[BaseProvider]] = [] if "debug" in sys.argv else [DebugProvider]
+DISABLED_PROVIDERS: list[type[BaseProvider]] = [] if args.debug else [DebugProvider]
 "Disabled provider types."
 
 PROVIDERS = [AppProvider, CalcProvider, CommandProvider, DebugProvider]
