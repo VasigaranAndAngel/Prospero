@@ -2,6 +2,8 @@ import atexit
 import sys
 from typing import TYPE_CHECKING
 
+import constants  # for update APP_STARTED_TIME  # noqa: F401
+
 if TYPE_CHECKING:
     from providers import BaseResult
     from providers._base_provider import BaseProvider

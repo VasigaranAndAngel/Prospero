@@ -2,6 +2,7 @@
 import ctypes
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from packaging.version import Version
@@ -45,6 +46,8 @@ except AttributeError:
     _as_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0  # pyright: ignore[reportAny]
 RUNNING_AS_ADMIN: bool = _as_admin
 
+APP_STARTED_TIME: datetime = datetime.now()
+
 __all__ = [
     "APPLICATION_NAME",
     "APPLICATION_VERSION",
@@ -52,4 +55,5 @@ __all__ = [
     "REPO_OWNER",
     "REPO_NAME",
     "RUNNING_AS_ADMIN",
+    "APP_STARTED_TIME",
 ]

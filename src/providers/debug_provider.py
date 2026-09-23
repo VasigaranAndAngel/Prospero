@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
@@ -34,6 +34,9 @@ class DebugProvider(BaseProvider):
         super().__init__("Debug Provider")
 
         self._loading_request: LoadingRequest = LoadingRequest(100)
+        if TYPE_CHECKING:
+            from ui._query_box._placeholder_formatter import PlaceholderFormatter
+        self._place_fmt: "PlaceholderFormatter | None" = None
 
         choices: list[DebugResult] = []
         for i in range(10):
@@ -91,7 +94,25 @@ class DebugProvider(BaseProvider):
 
     @override
     def search(self, query: str) -> Collection[DebugResult]:
-        return self._matcher.search(query)
+        results = self._matcher.search(query)
+
+        _q = query.strip()
+        if _q.lower().startswith("ph:"):
+            fmt = _q[3:]
+
+            if self._place_fmt is None:
+                from ui._query_box._placeholder_formatter import PlaceholderFormatter
+
+                self._place_fmt = PlaceholderFormatter(fmt)
+                _ = self._place_fmt.updated.connect(print)
+                self._place_fmt.start()
+
+            self._place_fmt._fmt = fmt
+            res = self._place_fmt.format(fmt)
+            print(f"starts with ph. {fmt=}; {res=}")
+            results.append(DebugResult(text=res, description=fmt, score=100))
+
+        return results
 
     @override
     def search_async(

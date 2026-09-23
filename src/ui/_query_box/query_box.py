@@ -15,6 +15,8 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QLineEdit, QWidget
 
+from ._placeholder_formatter import PlaceholderFormatter as PhF
+
 
 class QueryBox(QLineEdit):
     _start_loading_anim: Signal = Signal()
@@ -37,6 +39,19 @@ class QueryBox(QLineEdit):
         "Duration of single loop in ms"
         self._frame_count: int = int(self._fps * (self._anim_duration / 1000))
         "Total frames count for single loop"
+        self._placeholder: str | bool = True
+        "Query placeholder. True: auto calculated; False: no placeholder; str: Custom placeholder."
+        self._placeholder_alignment: Qt.AlignmentFlag = (
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+        )
+        self._placeholder_txt: str = ""
+        self._placeholder_formatter: PhF = PhF("{time:{h}:{mm}:{ss} {A}}", self)
+        "Placeholder formatter."
+
+        # Initialize placeholder based on the configured _placeholder value
+        self._update_placeholder()
+        _ = self._placeholder_formatter.updated.connect(self._update_placeholder)
+        self._placeholder_formatter.start()
 
         # Update frame metrics to match with new refresh rate of the screen
         # TODO: connect to new screen's refreshRateChanged when screen is changed
@@ -75,6 +90,15 @@ class QueryBox(QLineEdit):
         else:
             QTimer.singleShot(self._frame_interval, self._next_frame)
 
+        self.repaint()
+
+    def _update_placeholder(self, text: str = "") -> None:
+        if isinstance(self._placeholder, str):
+            self._placeholder_txt = self._placeholder
+        elif self._placeholder:
+            self._placeholder_txt = text
+        else:
+            self._placeholder_txt = ""
         self.repaint()
 
     def set_loading_state(self, state: bool) -> None:
@@ -143,3 +167,12 @@ class QueryBox(QLineEdit):
                 p.setBrush(QBrush(QColor(30, 144, 255)))
                 p.drawPolygon(polygon)
                 p.drawEllipse(QPointF(end_p.x() * ls, end_p.y()), l_width, l_width)
+
+        if self._placeholder:
+            with QPainter(self) as p:
+                c = self.palette().text().color()
+                c.setAlphaF(0.5)
+                t = self._placeholder_txt
+                a = self._placeholder_alignment
+                p.setPen(c)
+                p.drawText(self.contentsRect().adjusted(0, 0, -1, -1), t, a)
