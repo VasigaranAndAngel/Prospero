@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v0.1.0-alpha.4 (2026-09-23)
+
+### Features
+
+- Customizable system info rendering in query box.
+  ([`a82f650`](https://github.com/VasigaranAndAngel/Prospero/commit/a82f65081ded3d71b13fdd2cebbe74861327c2c6))
+
+- Placeholder formatter implementation.
+  ([`a82f650`](https://github.com/VasigaranAndAngel/Prospero/commit/a82f65081ded3d71b13fdd2cebbe74861327c2c6))
+
+- Application can run in offline mode by passing --offline cli arg.
+  ([`7b50242`](https://github.com/VasigaranAndAngel/Prospero/commit/7b502427ad9736e25fc12da819763ab2ffebd5b9))
+
+### Refactoring
+
+- Few refactorings here and there.
+  ([`dcb1685`](https://github.com/VasigaranAndAngel/Prospero/commit/dcb1685eced74ff04499316da8307df98f2c861a))
+
+- Argparse implementation
+  ([`7b50242`](https://github.com/VasigaranAndAngel/Prospero/commit/7b502427ad9736e25fc12da819763ab2ffebd5b9))
+
+- Provider can be enabled or disabled and few improves.
+  ([`0a54f76`](https://github.com/VasigaranAndAngel/Prospero/commit/0a54f76a15d3c8bb7bc033f47e2745a0c77d850d))
+
+- Result and Choice in providers are combined. and few improvements.
+  ([`b1ba0d7`](https://github.com/VasigaranAndAngel/Prospero/commit/b1ba0d7f36f829fa0444bbb40046531614692c2a))
+
+
 ## v0.1.0-alpha.3 (2026-09-16)
 
 ### Bug Fixes
