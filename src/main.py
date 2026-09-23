@@ -82,7 +82,6 @@ def ui() -> None:
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
     import assets
-    import constants
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
     from updater import Updater

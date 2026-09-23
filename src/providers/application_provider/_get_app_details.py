@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 from data_objects import IconLoadMethod, LoadMethod
 
+from ._lnk_parser import parse_lnk
+
 logger = logging.getLogger(__name__)
 
 _START_MENU_PATH: Path = Path("Microsoft/Windows/Start Menu/")
@@ -118,6 +120,19 @@ def _build_full_app_list() -> list[AppDetail]:
         )
 
     # all shortcut entries
+    # parse and remove dupe .lnk files.
+    seen: set[tuple[str, str, str, str]] = set()
+    for s in shortcuts.copy():
+        if s.LnkPath.suffix.casefold() == ".lnk":
+            ld = parse_lnk(s.LnkPath)
+            if ld is None:
+                continue
+            k = ld.dedupe_key
+            if k in seen:
+                shortcuts.remove(s)
+            seen.add(k)
+
+    # add entries
     for s in shortcuts:
         full_list.append(
             AppDetail(
