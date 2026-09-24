@@ -121,6 +121,27 @@ def _patch_pylnk3() -> None:
 _patch_pylnk3()
 
 
+def _stream_size(f) -> int:
+    try:
+        return os.fstat(f.fileno()).st_size
+    except (OSError, AttributeError):
+        pass
+    getbuffer = getattr(f, "getbuffer", None)
+    if getbuffer is not None:
+        try:
+            return getbuffer().nbytes
+        except (AttributeError, ValueError):
+            pass
+    try:
+        pos = f.tell()
+        end = f.seek(0, 2)
+        f.seek(pos)
+        return end
+    except (OSError, AttributeError):
+        pass
+    return 0
+
+
 class _BoundedReader:
     """File-like wrapper that guards a parse against runaway reads.
 
@@ -136,11 +157,7 @@ class _BoundedReader:
     def __init__(self, f, *, deadline: float | None = None) -> None:
         self._f = f
         self._deadline = deadline
-        try:
-            size = os.fstat(f.fileno()).st_size
-        except (OSError, AttributeError):
-            size = 0
-        self._budget = size * self._BUFFER_FACTOR + self._SLACK
+        self._budget = _stream_size(f) * self._BUFFER_FACTOR + self._SLACK
         self._read = 0
 
     def read(self, size: int = -1) -> bytes:
@@ -150,6 +167,8 @@ class _BoundedReader:
             size = max(0, self._budget - self._read)
         data = self._f.read(size)
         self._read += len(data)
+        if size > 0 and len(data) < size:
+            raise EOFError("shortcut data truncated")
         return data
 
     def seek(self, *args, **kwargs) -> int:

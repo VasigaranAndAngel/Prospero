@@ -11,9 +11,10 @@ from typing import Literal, override
 
 from pydantic import BaseModel
 
+from configs import conf
 from data_objects import IconLoadMethod, LoadMethod
 
-from ._lnk_parser import parse_lnk
+from ._lnk_parser import LnkDetail, parse_lnk
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,8 @@ class AppDetail:
     type: Literal["uwp", "desktop", "unknown"] | None = None
     path: Path | None = None
     icon: IconLoadMethod | None = None
+    lnk_detail: LnkDetail | None = None
+    recent_files: list[Path] | None = None
 
 
 def _run_ps(command: str):
@@ -120,26 +123,24 @@ def _build_full_app_list() -> list[AppDetail]:
         )
 
     # all shortcut entries
-    # parse and remove dupe .lnk files.
     seen: set[tuple[str, str, str, str]] = set()
-    for s in shortcuts.copy():
-        if s.LnkPath.suffix.casefold() == ".lnk":
-            ld = parse_lnk(s.LnkPath)
-            if ld is None:
-                continue
+    for s in shortcuts:
+        is_lnk = s.LnkPath.suffix.casefold() == ".lnk"
+        ld = parse_lnk(s.LnkPath) if is_lnk else None
+        if ld is not None:
+            # drop dupe .lnk files.
             k = ld.dedupe_key
             if k in seen:
-                shortcuts.remove(s)
+                continue
             seen.add(k)
 
-    # add entries
-    for s in shortcuts:
         full_list.append(
             AppDetail(
                 app_name=s.Name,
                 type="desktop",
                 path=s.LnkPath,
                 icon=s.icon_load_method,
+                lnk_detail=ld,
             )
         )
 
@@ -148,9 +149,20 @@ def _build_full_app_list() -> list[AppDetail]:
     return full_list
 
 
+def _get_recent_files(detail: list[AppDetail]) -> list[AppDetail]:
+    "Fills recent_file on each app from its Windows jump list. Modifies and returns detail."
+    t1 = time.perf_counter()
+    from ._get_recents import get_recent_files
+
+    res = get_recent_files(detail)
+    logger.debug(f"recent files retrieving took: {time.perf_counter() - t1}")
+    return res
+
+
 class AppDetailsFetcher(Thread):
     def __init__(self, callback: Callable[[list[AppDetail]], None]) -> None:
         super().__init__()
+        self.still_fetching: bool = False
         self._callback: Callable[[list[AppDetail]], None] = callback
 
     @override
@@ -160,4 +172,9 @@ class AppDetailsFetcher(Thread):
 
         Calling directly will block this thread. Call start method to fetch from separate thread.
         """
-        self._callback(_build_full_app_list())
+        recent_on = conf.providers.app_provider.show_recent_files.value
+        self.still_fetching = recent_on
+        self._callback(x := _build_full_app_list())  # give app list. finding recent takes a while
+        self.still_fetching = False  # this will used when calling next callback
+        if recent_on:
+            self._callback(_get_recent_files(x))

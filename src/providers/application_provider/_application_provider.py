@@ -54,7 +54,7 @@ class AppProvider(BaseProvider):
         self.app_details.start()
 
     def _update_choices(self, details: list[AppDetail]) -> None:
-        self._fetching_app_details = False
+        self._fetching_app_details = self.app_details.still_fetching
 
         choices: list[AppResult] = []
         for d in details:
@@ -73,6 +73,16 @@ class AppProvider(BaseProvider):
                 icon_load_method=d.icon or IconLoadMethod(LoadMethod.default),
             )
             choices.append(res)
+
+            if d.recent_files is not None:
+                for r in d.recent_files:
+                    res = AppResult(
+                        text=(d.app_name or "") + " Recent: " + r.name,
+                        command=f'start "" {r}',
+                        description=str(r),
+                        icon_load_method=IconLoadMethod(LoadMethod.win32api, r),
+                    )
+                    choices.append(res)
 
         self.matcher.update_choices(choices)
         if self._call_after_fetching is not None:
@@ -97,8 +107,9 @@ class AppProvider(BaseProvider):
             # Using a wrapper that will be called as soon as search is completed to remove loading request
             def _wrapper(arg: Collection[BaseResult] | LoadingRequest) -> None:
                 "To remove LoadingRequest before giving results."
-                self._loading_request.remove()
-                self._loading_request_sent = False
+                if not self._fetching_app_details:
+                    self._loading_request.remove()
+                    self._loading_request_sent = False
                 callback(arg)
 
             self._call_after_fetching = partial(super().search_async, query, _wrapper)

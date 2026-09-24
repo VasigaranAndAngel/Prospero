@@ -15,7 +15,12 @@ from config_models import ChangeEvent, Observable
 from constants import APPLICATION_NAME
 
 from ._ui_info import Category, UIInfo
-from .categories import AppearanceCategory, GeneralCategory, WindowGeometryCategory
+from .categories import (
+    AppearanceCategory,
+    GeneralCategory,
+    ProvidersCategory,
+    WindowGeometryCategory,
+)
 
 CONFIG_FILE_PATH = Path.home() / ".config" / (APPLICATION_NAME.title() + ".toml")
 
@@ -44,6 +49,11 @@ class Configs(BaseSettings):
         default_factory=AppearanceCategory,
         title="Appearance",
         description="Configurations related to Appearance.",
+    )
+    providers: Annotated[ProvidersCategory, Category()] = Field(
+        default_factory=ProvidersCategory,
+        title="Providers",
+        description="Configurations related to Providers.",
     )
 
     # Since BaseSettings doesn't allow multiple inheritance,
