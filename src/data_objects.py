@@ -10,9 +10,13 @@ Currently defines:
       win32api, from file, or default), with optional file path.
 """
 
+from collections import defaultdict
+from collections.abc import Callable
 from enum import Enum, auto
 from pathlib import Path
 from typing import ClassVar, override
+
+from helpers import SingletonMeta
 
 
 class LoadMethod(Enum):
@@ -65,3 +69,25 @@ class IconLoadMethod:
     @staticmethod
     def _get_hash(load_method: LoadMethod, file_path: Path | None, app_id: str | None) -> int:
         return hash(f"{load_method}{file_path}{app_id}")
+
+
+class MutableAppDetailsMeta(SingletonMeta):
+    @override
+    def __setattr__(self, name: str, value: object, /) -> None:
+        super().__setattr__(name, value)
+        if name in self._hooks:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            for c in self._hooks[name]:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+                c(value)
+
+
+class MutableAppDetails(metaclass=MutableAppDetailsMeta):
+    result_count: ClassVar[int] = 0
+    _hooks: ClassVar[dict[str, list[Callable[[object], None]]]] = defaultdict(list)
+
+    @classmethod
+    def add_hook(cls, attr: str, callback: Callable[[object], None]) -> None:
+        cls._hooks[attr].append(callback)
+
+    @classmethod
+    def remove_hook(cls, attr: str, callback: Callable[[object], None]) -> None:
+        cls._hooks[attr].remove(callback)

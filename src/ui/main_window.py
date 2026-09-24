@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
+from data_objects import MutableAppDetails
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
 from shared_ui_elements import AnimatedVBoxLayout
 from theme import theme
@@ -206,6 +207,7 @@ class MainWindow(QWidget):
 
         # Add new widgets
         layout.setWidgets(self._result_boxes)
+        MutableAppDetails.result_count = len(self._result_boxes)
 
         # Set window's size
         widget.adjustSize()

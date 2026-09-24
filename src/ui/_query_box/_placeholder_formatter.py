@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
 from constants import VERSION
+from data_objects import MutableAppDetails
 
 
 @dataclass
@@ -203,6 +204,9 @@ class PlaceholderFormatter(QObject):
         super().__init__(parent)
         self._fmt: str = fmt
 
+        # TODO: should only emit if relevant token is in use.
+        MutableAppDetails.add_hook("result_count", lambda x: self._format_and_emit())
+
         self._timer: QTimer = QTimer(self)
         self._timer.setInterval(1000)  # should be set from config
         # TODO: handle special cases like updating for Updater response and faster updates if needed
@@ -350,6 +354,11 @@ def _app_uptime(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedF
     delta = datetime.now() - APP_STARTED_TIME
     m.d = delta
     return _format(spec, m, enable_units=True) if spec else _humanize_duration(delta)
+
+
+@register_token("app.result_count")
+def _app_result_count(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+    return str(MutableAppDetails.result_count)
 
 
 # endregion
