@@ -7,6 +7,11 @@ from PySide6.QtWidgets import QWidget
 from constants import APPLICATION_NAME, VERSION
 from data_objects import IconLoadMethod, LoadMethod
 from helpers import SingletonQObjectMeta
+
+# Narrow on NetworkError itself rather than Updater.GithubFetchError. They are the same
+# class at runtime, but GithubFetchError is a class attribute, and a type checker cannot
+# use an attribute to narrow an isinstance check.
+from network import NetworkError
 from updater import Downloaded, GithubLatestRelease, Updater
 
 from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultBox
@@ -72,13 +77,11 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self.set_description("Update aborted")
         QTimer.singleShot(1500, self._update_name_and_description)
 
-    def _on_update_checked(
-        self, release: GithubLatestRelease | Updater.GithubFetchError | None
-    ) -> None:
+    def _on_update_checked(self, release: GithubLatestRelease | NetworkError | None) -> None:
         self._update_checking = False
         self._latest_release = None
 
-        if isinstance(release, Updater.GithubFetchError):
+        if isinstance(release, NetworkError):
             desc = release.error_str
         elif release is None:
             desc = "No updates available."
