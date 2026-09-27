@@ -33,10 +33,13 @@ PUMP_TIMEOUT_S: float = 20.0
 
 
 class _Server(ThreadingHTTPServer):
-    """Test server that can be told what release payload to hand out."""
+    """Test server that can be told what release payload or wheel to hand out."""
 
     release_payload: bytes = b'{"unexpected": true}'
     "Body served for /repos paths. Tests overwrite this to shape the updater result."
+
+    wheel_bytes: bytes = b""
+    "Body served for any .whl path, so a synthetic wheel can be 'downloaded'."
 
     @override
     def handle_error(self, request: object, client_address: object) -> None:
@@ -65,6 +68,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_slowly(int(path.rsplit("/", 1)[-1]), chunk=512, delay=0.05)
         elif path.startswith("/repos/"):
             self._send_all(cast("_Server", self.server).release_payload)
+        elif path.endswith(".whl"):
+            self._send_all(cast("_Server", self.server).wheel_bytes)
         else:
             self._empty(404)
 

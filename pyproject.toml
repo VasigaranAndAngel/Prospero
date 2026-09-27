@@ -60,6 +60,11 @@ line-length = 100
 python-version = "3.13"
 python-platform = "all"
 
+# Test modules import sibling helpers by bare name, which works because pytest puts each test
+# directory on sys.path. Only the one that has a helper module is added here; adding tests/ itself
+# would make tests/network/ shadow src/network/.
+search-path = ["tests/package_manager"]
+
 # Behave more like a strict checker
 check-unannotated-defs = true
 infer-return-types = "checked"

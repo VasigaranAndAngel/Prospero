@@ -28,7 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, ClassVar, Final, Self
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
@@ -132,6 +132,36 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
         """
         base = cls._base_urls.get(service, default_base).rstrip("/")
         return urljoin(f"{base}/", path) if path else base
+
+    @classmethod
+    def mirror(cls, service: str, url: str) -> str:
+        """Re-points a url at a service's base url override, if one is set.
+
+        Lets a caller keep a hard coded url, which is what a pinned download should be, while still
+        being able to send the request to a mirror.
+
+        Args:
+            service (str): Logical service name, e.g. ``"pypi"``.
+            url (str): The url to repoint.
+
+        Returns:
+            str: ``url`` unchanged when no override is set, otherwise the same
+            path and query against the override's origin.
+        """
+        base = cls._base_urls.get(service)
+        if not base:
+            return url
+        target = urlsplit(url)
+        origin = urlsplit(base)
+        return urlunsplit(
+            (
+                origin.scheme or target.scheme,
+                origin.netloc,
+                target.path,
+                target.query,
+                target.fragment,
+            )
+        )
 
     def active(self) -> list[str]:
         """Urls of the requests currently in flight."""
