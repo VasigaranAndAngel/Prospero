@@ -6,7 +6,7 @@ trigger hooks when the value is updated.
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar, Generic, TypeVar, cast, override
+from typing import ClassVar, Generic, TypeVar, cast, get_args, override
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, model_serializer, model_validator
 
@@ -25,6 +25,27 @@ class ChangeEvent:
     "The new value"
     source: "ConfigValue"  # pyright: ignore[reportMissingTypeArgument]
     "The ConfigValue instance where the bubble emitted from."
+
+
+def takes_event(cb: Callable[..., object]) -> bool:
+    """Whether a change hook wants the ChangeEvent or should be called with no arguments.
+
+    The first declared parameter has to be annotated with ChangeEvent. ``self`` is skipped. A union
+    such as ``ChangeEvent | None`` counts too.
+
+    Args:
+        cb (Callable[..., object]): The subscribed callback.
+
+    Returns:
+        bool: True to call the callback with the event, False to call it bare.
+    """
+    spec = inspect.getfullargspec(cb)
+    args = spec.args[1:] if spec.args[:1] == ["self"] else spec.args
+    if not args:
+        return False
+
+    annotation = spec.annotations.get(args[0])
+    return annotation is ChangeEvent or ChangeEvent in get_args(annotation)
 
 
 class Observable(BaseModel):
@@ -51,9 +72,7 @@ class Observable(BaseModel):
                 change.
         """
         for cb in self._change_hooks:
-            spec = inspect.getfullargspec(cb)
-            if len(spec.args) > 0 and spec.annotations[spec.args[0]][1] == ChangeEvent:
-                # if len of args is at least 1 and first arg's type annotation is ChangEvent
+            if takes_event(cb):
                 cast(Callable[[ChangeEvent], None], cb)(event)
             else:
                 cast(Callable[[], None], cb)()

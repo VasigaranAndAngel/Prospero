@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, override
+from typing import Annotated, Any, ClassVar, cast, override
 
 import tomli_w
 from pydantic import BaseModel, Field, PrivateAttr
@@ -12,6 +12,7 @@ from pydantic_settings import (
 )
 
 from config_models import ChangeEvent, Observable
+from config_models._config_value import takes_event
 from constants import APPLICATION_NAME
 
 from ._ui_info import Category, UIInfo
@@ -26,7 +27,9 @@ CONFIG_FILE_PATH = Path.home() / ".config" / (APPLICATION_NAME.title() + ".toml"
 
 
 class Configs(BaseSettings):
-    _change_hooks: list[Callable[[ChangeEvent], None]] = PrivateAttr(default_factory=list)
+    _change_hooks: list[Callable[[], None] | Callable[[ChangeEvent], None]] = PrivateAttr(
+        default_factory=list
+    )
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         toml_file=CONFIG_FILE_PATH,
@@ -61,19 +64,24 @@ class Configs(BaseSettings):
     @override
     def model_post_init(self, context: object, /) -> None:
         for field_name in type(self).model_fields:
-            field = getattr(self, field_name)
+            field = getattr(self, field_name)  # pyright: ignore[reportAny]
             if isinstance(field, Observable):
-                field._field_name = field_name
+                field._field_name = field_name  # pyright: ignore[reportPrivateUsage]
                 # adding this Configs._emit to each field of Configs as hooks which emits on every
                 # config change.
                 field.subscribe(self._emit)
 
-    def subscribe(self, cb: Callable[[ChangeEvent], None]) -> None:
+    def subscribe(self, cb: Callable[[], None] | Callable[[ChangeEvent], None]) -> None:
         self._change_hooks.append(cb)
 
     def _emit(self, event: ChangeEvent) -> None:
+        # Configs is not an Observable, because BaseSettings forbids multiple inheritance,
+        # so this mirrors Observable._emit rather than inheriting it.
         for func in self._change_hooks:
-            func(event)
+            if takes_event(func):
+                cast(Callable[[ChangeEvent], None], func)(event)
+            else:
+                cast(Callable[[], None], func)()
 
     @override
     @classmethod
