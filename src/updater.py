@@ -2,37 +2,32 @@ import logging
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import ClassVar, Final, Literal
 
 from packaging.version import Version
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from PySide6.QtCore import QObject, QTimer, Signal
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import QApplication, QWidget
 
 from arg_parser import args
 from constants import APPLICATION_NAME, APPLICATION_PATH, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
 from helpers import SingletonQObjectMeta
+from network import Downloaded, NetworkClient, NetworkError
 
 logger = logging.getLogger(__name__)
 
+GITHUB_SERVICE: Final[str] = "github"
+"Service name used to register a base url override for the GitHub API."
+
+DEFAULT_GITHUB_DOMAIN: Final[str] = "https://api.github.com"
+
+__all__ = ["Downloaded", "GithubLatestRelease", "NetworkError", "Updater"]
+
 
 @dataclass
-class Downloaded:
-    download_progress: float
-    downloaded_size: int
-    total_size: int
-    completed: bool
-    file_path: Path
-    speed: float | None = None
-    aborted: bool = False
-
-
 class _GithubAsset(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
 
@@ -63,15 +58,17 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
     """This is a singleton object which can check for new version of application and download and
     install it. Since it is inherited QObject this class should be initialized after a QApplication
     instance is created.
+
+    Networking is delegated to :class:`network.NetworkClient`, so this class only knows how to speak
+    the GitHub release API and how to launch the installer.
     """
 
-    @dataclass(frozen=True)
-    class GithubFetchError:
-        error_str: str = "Failed to fetch from github."
+    GithubFetchError: type[NetworkError] = NetworkError
+    "Kept for callers that test for it by name. NetworkError is the type itself."
 
     update_checked: Signal = Signal(object)
     """Emitted with a GithubLatestRelease of latest version if available else emitted with None.
-    In case of error, Updater.GithubFetchError is emitted.
+    In case of error, a NetworkError is emitted.
     """
     downloaded: Signal = Signal(Downloaded)
     "Will be emitted while the file is downloading and downloaded."
@@ -82,69 +79,54 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         super().__init__(parent)
 
         self._update_progress: bool = False
-        self._downloading: QNetworkReply | None = None
-        self._network_manager: QNetworkAccessManager = QNetworkAccessManager()
+        self._download_url: str | None = None
+        "Url of the installer being downloaded, so that it can be cancelled."
 
-    def _prepare_release_and_send(
-        self,
-        reply: QNetworkReply,
-        sent_to: Callable[[GithubLatestRelease | GithubFetchError], None],
-    ) -> None:
-        if reply.error() == QNetworkReply.NetworkError.NoError:
-            try:
-                data = reply.readAll().data()
-                if isinstance(data, memoryview):
-                    logger.warning(
-                        f"Failed to fetch ({reply.url().toString()}) latest release from github: data type is {memoryview}"
-                    )
-                    sent_to(self.GithubFetchError())
-                    return
+        self._network: NetworkClient = NetworkClient()
+        self._apply_domain_override()
 
-                release = GithubLatestRelease.model_validate_json(data)
-                sent_to(release)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to fetch ({reply.url().toString()}) latest release from github: {e}"
-                )
-                sent_to(self.GithubFetchError())
-        else:
-            logger.warning(
-                f"Failed to fetch ({reply.url().toString()}) latest release from github: {reply.errorString()}"
-            )
-            sent_to(self.GithubFetchError())
+    def _apply_domain_override(self) -> None:
+        if (domains := args.update_domain) is not None:
+            logger.debug("Fetching from custom domain: '%s'", domains[0])
+            NetworkClient.set_base_url(GITHUB_SERVICE, domains[0])
 
     def get_latest_release(
-        self, callback: Callable[[GithubLatestRelease | GithubFetchError], None]
+        self, callback: Callable[[GithubLatestRelease | NetworkError], None]
     ) -> None:
-        if args.offline:
-            # NOTE: temporary solution for block the internet. Internet should be blocked globally.
-            logger.warning("Application running in offline mode. Can't connect to internet.")
-            callback(
-                Updater.GithubFetchError(
-                    "Application running in offline mode. Can't connect to internet."
-                )
-            )
-            return
-        logger.debug("Fetching github for latest release.")
-        update_domain = args.update_domain
-        if update_domain is not None:
-            domain = update_domain[0]
-            logger.debug(f"Fetching from custom domain: '{domain}'")
-        else:
-            domain = "https://api.github.com"
-        uri = f"{domain}/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
-        reply = self._network_manager.get(QNetworkRequest(uri))
+        """Fetches the latest release from GitHub.
 
-        _ = reply.finished.connect(partial(self._prepare_release_and_send, reply, callback))
+        Args:
+            callback (Callable): Called with the release, or with a NetworkError if it could not be
+                fetched.
+        """
+        logger.debug("Fetching github for latest release.")
+        uri = NetworkClient.resolve(
+            GITHUB_SERVICE,
+            DEFAULT_GITHUB_DOMAIN,
+            f"repos/{REPO_OWNER}/{REPO_NAME}/releases/latest",
+        )
+
+        def _on_fetched(result: bytes | NetworkError) -> None:
+            if isinstance(result, NetworkError):
+                logger.warning("Failed to fetch latest release from github: %s", result.error_str)
+                callback(result)
+                return
+            try:
+                callback(GithubLatestRelease.model_validate_json(result))
+            except ValidationError as e:
+                logger.warning("Unexpected release payload from github: %s", e)
+                callback(NetworkError(f"Unexpected release payload from github: {e}", uri))
+
+        self._network.fetch(uri, _on_fetched)
 
     def check_update(self) -> None:
         logger.debug("Checking for update...")
 
-        def _callback(release: "GithubLatestRelease | Updater.GithubFetchError") -> None:
-            if isinstance(release, Updater.GithubFetchError):
+        def _callback(release: GithubLatestRelease | NetworkError) -> None:
+            if isinstance(release, NetworkError):
                 self.update_checked.emit(release)
             elif release.get_version() > APPLICATION_VERSION:
-                logger.debug(f"Update available: {release.tag_name}")
+                logger.debug("Update available: %s", release.tag_name)
                 self.update_checked.emit(release)
             else:
                 logger.debug(f"{APPLICATION_NAME.title()} is upto date.")
@@ -162,43 +144,39 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         """
         if self._update_progress:
             return
-        self._update_progress = True
-        logger.debug("Update sequence started...")
+
         file_asset = release.assets[0]
         tmp_dir = tempfile.mkdtemp(prefix=APPLICATION_NAME.title() + " Installer")
         file_path = Path(tmp_dir) / file_asset.name
+        url = file_asset.browser_download_url
 
-        reply = self._network_manager.get(QNetworkRequest(file_asset.browser_download_url))
+        self._update_progress = True
+        self._download_url = url
+        logger.debug("Update sequence started, downloading %s", url)
         self.download_started.emit()
-        self._downloading = reply
-        started_at = time.time()
 
-        def _on_downloading(downloaded: int, total: int) -> None:
-            ct = time.time()
-            speed = downloaded / (ct - started_at)  # average speed
-            self.downloaded.emit(
-                Downloaded(downloaded / total, downloaded, total, False, file_path, speed)
-            )
+        def _on_downloaded(state: Downloaded) -> None:
+            self._update_progress = not (state.completed or state.aborted)
+            self._download_url = None
+            self.downloaded.emit(state)
+            if state.completed:
+                QTimer.singleShot(1000, lambda: self._run_installer(state.file_path))
 
-        def _on_downloaded() -> None:
-            if self._update_progress:
-                _ = file_path.write_bytes(reply.readAll().data())
-                self.downloaded.emit(
-                    Downloaded(1, file_asset.size, file_asset.size, True, file_path)
-                )
-                self._downloading = None
-                QTimer.singleShot(1000, lambda: self._run_installer(file_path))
-
-        _ = reply.downloadProgress.connect(_on_downloading)
-        _ = reply.finished.connect(_on_downloaded)
+        self._network.download(url, file_path, _on_downloaded)
 
     def cancel_update(self) -> None:
-        if self._downloading is not None:
-            self._update_progress = False
-            self._downloading.abort()
-            self._downloading = None
-            logger.debug("Update aborted.")
+        if not self._update_progress:
+            return
+
+        logger.debug("Update aborted.")
+        self._update_progress = False
+        url, self._download_url = self._download_url, None
+
+        if url is None:
             self.downloaded.emit(Downloaded(0, 0, 0, False, Path(), aborted=True))
+        else:
+            # The client reports the aborted transfer, so no state is emitted here.
+            self._network.cancel(url)
 
     def _run_installer(self, installer_path: Path) -> None:
         cmd = [str(installer_path)]
