@@ -11,7 +11,12 @@ from fuzzy_finder import BaseChoice, IncrementalMatcher
 from helpers import task_schedule_handler
 
 from .._base_provider import BaseProvider
-from ..base_result_and_widgets import BaseResult, BaseResultBoxWidget, ExecutionAction
+from ..base_result_and_widgets import (
+    BaseResult,
+    BaseResultBoxWidget,
+    ExecutionAction,
+    ResultAttributes,
+)
 from ._shutdown import shutdown_respect_hybrid
 from ._updater_result_widget import UpdaterResultWidget
 
@@ -133,6 +138,7 @@ class CommandProvider(BaseProvider):
                 description=command.description,
                 result_widget_factory=command.result_widget_factory,
                 func=command,
+                attributes=ResultAttributes(suggestion_request=name)
             )
             for name, command in _COMMANDS.items()
         ]

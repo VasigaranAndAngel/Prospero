@@ -63,6 +63,12 @@ class QueryBox(QLineEdit):
         self.setFixedHeight(60)
         self.setContentsMargins(10, 10, 10, 10)
 
+        self._suggestion: str | None = None
+        "The full suggestion text."
+        self._suggestion_render_text: str = ""
+        "Part of suggestion text which will be rendered."
+        _ = self.textChanged.connect(self._update_suggestion)
+
         font = self.font()
         font.setPointSize(int(font.pointSize() * 1.4))
         self.setFont(font)
@@ -101,12 +107,25 @@ class QueryBox(QLineEdit):
             self._placeholder_txt = ""
         self.repaint()
 
+    def _update_suggestion(self, new_txt: str | None = None) -> None:
+        sug = self._suggestion
+        txt = new_txt or self.text()
+        if sug is not None and txt and sug.casefold().startswith(txt):
+            self._suggestion_render_text = sug[len(txt) :]
+        else:
+            self._suggestion_render_text = ""
+        self.repaint()
+
     def set_loading_state(self, state: bool) -> None:
         if not self._loading_state and state:
             if not self._render_line:
                 self._render_line = True
                 self._start_loading_anim.emit()
         self._loading_state = state
+
+    def set_suggestion(self, sug: str) -> None:
+        self._suggestion = sug
+        self._update_suggestion()
 
     @override
     def showEvent(self, event: QShowEvent, /) -> None:
@@ -170,9 +189,17 @@ class QueryBox(QLineEdit):
 
         if self._placeholder:
             with QPainter(self) as p:
-                c = self.palette().text().color()
-                c.setAlphaF(0.5)
                 t = self._placeholder_txt
                 a = self._placeholder_alignment
-                p.setPen(c)
-                p.drawText(self.contentsRect().adjusted(0, 0, -1, -1), t, a)
+                p.setPen(self.palette().placeholderText().color())
+                p.drawText(self.contentsRect().adjusted(0, 0, 0, 0), t, a)
+
+        if self._suggestion_render_text:
+            with QPainter(self) as p:
+                cr = self.contentsRect()
+                fm = p.fontMetrics()
+                x = cr.left() + fm.size(0, self.text()).width() + 6  # Not sure about this 6
+                mid_y = cr.height() // 2
+                y = mid_y + fm.ascent()
+                p.setPen(self.palette().placeholderText().color())
+                p.drawText(x, y, self._suggestion_render_text)

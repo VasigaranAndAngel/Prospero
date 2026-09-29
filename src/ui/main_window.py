@@ -225,7 +225,11 @@ class MainWindow(QWidget):
             for res_box in self._result_boxes:
                 if res_box.shadow_focus:
                     self._shadow_focused_idx = self._result_boxes.index(res_box)
-            self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
+            rb = self._result_boxes[self._shadow_focused_idx]
+            rb.set_shadow_focus(True)
+            sg = rb.result.attributes.suggestion_request
+            if sg is not None:
+                self._query_box.set_suggestion(sg)
         else:
             self._shadow_focused_idx = None
 

@@ -39,7 +39,7 @@ class ExecutionAction(Enum):
 class ResultAttributes:
     highlight_request: None = None
     "If need to highlight anything in query."
-    suggestion_request: None = None
+    suggestion_request: None | str = None
     "If anything is there to show as query suggestion."
     coloring_request: None = None
     "If need to colorized anything in query."

@@ -11,7 +11,7 @@ from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
 from .._loading_request import LoadingRequest
-from ..base_result_and_widgets import BaseResult, ExecutionAction
+from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultAttributes
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ class AppProvider(BaseProvider):
                 command=command,
                 description=str(path_or_app_id),
                 icon_load_method=d.icon or IconLoadMethod(LoadMethod.default),
+                attributes=ResultAttributes(suggestion_request=d.app_name or ""),
             )
             choices.append(res)
 
@@ -81,6 +82,7 @@ class AppProvider(BaseProvider):
                         command=f'start "" {r}',
                         description=str(r),
                         icon_load_method=IconLoadMethod(LoadMethod.win32api, r),
+                        attributes=ResultAttributes(suggestion_request=d.app_name or ""),
                     )
                     choices.append(res)
 
