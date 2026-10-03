@@ -5,6 +5,7 @@ import pytest
 from packaging.version import Version
 
 from constants import APPLICATION_NAME
+from query_placeholder_tokens import register_query_placeholder_token
 from ui._query_box._placeholder_formatter import (
     PlaceholderFormatter,
     _Metrics,
@@ -53,7 +54,7 @@ class TestBugFixes:
     def test_duplicate_registration_raises(self):
         with pytest.raises(ValueError):
 
-            @PlaceholderFormatter.register_token("time")
+            @register_query_placeholder_token("time")
             def _dup(m, spec):
                 return "nope"
 
@@ -444,3 +445,41 @@ def test_perf():
     for _ in range(10_000):
         fmt(template)
     print("\n", time.perf_counter() - st)
+
+
+# ---------------------------------------------------------------------------- #
+#                                 token tracing                                #
+# ---------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "format, used_token",
+    (
+        (r"{app.name}", {"app.name"}),
+        (r"{app.version:v{v.major}.{v.minor}}", {"app.version", "v.major", "v.minor"}),
+        (
+            r"{app.name:{title}} {app.version:v{v.major}.{v.minor}} - {notifications.count} - {time:{HH}:{mm}} - {update.available}",
+            {
+                "app.name",
+                "title",
+                "app.version",
+                "v.major",
+                "v.minor",
+                "notifications.count",
+                "time",
+                "HH",
+                "mm",
+                "update.available",
+            },
+        ),
+    ),
+)
+def test_tracing_token(format: str, used_token: set[str]):
+    p = PlaceholderFormatter(format)
+    assert p._traced_tokens == used_token
+
+
+# ---------------------------------------------------------------------------- #
+#                  trigger update token from unrelated sources                 #
+# ---------------------------------------------------------------------------- #
+def test_token_update():
+    # TODO
+    pass

@@ -2,14 +2,21 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
+from functools import lru_cache, partial
+from typing import ClassVar
 
 from packaging.version import Version
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
 from constants import VERSION
-from data_objects import MutableAppDetails
+from query_placeholder_tokens import (
+    _TOKEN_UPDATE_HOOK,  # pyright: ignore[reportPrivateUsage]
+    _TOKENS,  # pyright: ignore[reportPrivateUsage]
+)
+from query_placeholder_tokens import register_query_placeholder_token as register_token
+
+__all__ = ["register_token", "PlaceholderFormatter"]
 
 
 @dataclass
@@ -63,7 +70,7 @@ _UNIT_TOKENS: dict[str, Callable[[_Metrics, str], str]] = {
     ),
     # version parts (from m.v)
     "v": lambda m, _spec: str(m.v),
-    "v.epoch": lambda m, _spac: str(m.v.epoch),
+    "v.epoch": lambda m, _spec: str(m.v.epoch),
     "v.major": lambda m, _spec: str(m.v.major),
     "v.minor": lambda m, _spec: str(m.v.minor),
     "v.micro": lambda m, _spec: str(m.v.micro),
@@ -197,23 +204,51 @@ class PlaceholderFormatter(QObject):
 
     # TODO: Check validity of format on format update.
 
-    _TOKENS: dict[str, Callable[[_Metrics, str], str]] = {}
     updated: "Signal" = Signal(str)
+    _token_update_signal: Signal = Signal(str)  # to move to main thread
+    _trace_tokens: ClassVar[bool] = False
+    _traced_tokens: ClassVar[set[str]] = set()
+    "Traced registered tokens."
 
     def __init__(self, fmt: str, parent: "QWidget | None" = None) -> None:
         super().__init__(parent)
         self._fmt: str = fmt
 
-        # TODO: should only emit if relevant token is in use.
-        MutableAppDetails.add_hook("result_count", lambda x: self._format_and_emit())
-
         self._timer: QTimer = QTimer(self)
-        self._timer.setInterval(1000)  # should be set from config
+        self._timer.setInterval(100)  # TODO: should be set from config
         # TODO: handle special cases like updating for Updater response and faster updates if needed
         _ = self._timer.timeout.connect(self._format_and_emit)
 
+        self.set_formatter(fmt)
+        _ = self._token_update_signal.connect(self._token_update)
+        _TOKEN_UPDATE_HOOK.add(self._token_update_signal.emit)
+        _ = self.destroyed.connect(partial(_TOKEN_UPDATE_HOOK.remove, self._token_update))
+
+    def _token_update(self, token: str) -> None:
+        if PlaceholderFormatter._token_in_use(token):
+            self._format_and_emit()
+
     def _format_and_emit(self) -> None:
         self.updated.emit(self.format(self._fmt))
+
+    @classmethod
+    def _token_in_use(cls, token: str) -> bool:
+        return token in cls._traced_tokens
+
+    def set_formatter(self, formatter: str) -> None:
+        self._fmt = formatter
+
+        # trace tokens
+        PlaceholderFormatter._trace_tokens = True
+        PlaceholderFormatter._traced_tokens = set()
+        _ = _format(formatter)
+        PlaceholderFormatter._trace_tokens = False
+
+        # set the timer according to traced_tokens
+        if self._token_in_use("SSS"):
+            self._timer.setInterval(1)  # TODO: limit to refresh rate of screen
+        else:
+            self._timer.setInterval(100)  # TODO: set from config
 
     def start(self) -> None:
         self._timer.start()
@@ -221,21 +256,6 @@ class PlaceholderFormatter(QObject):
 
     def end(self) -> None:
         self._timer.stop()
-
-    @classmethod
-    def register_token(
-        cls, token: str, placeholder: str | None = None
-    ) -> Callable[[Callable[[_Metrics, str], str]], Callable[[_Metrics, str], str]]:
-        def _decorator(func: Callable[[_Metrics, str], str]) -> Callable[[_Metrics, str], str]:
-            if token in cls._TOKENS:
-                raise ValueError(f"Token {token!r} is already registered")
-
-            if placeholder is not None:
-                func = lambda _m, _s: f"'{token}' {placeholder}"
-            cls._TOKENS[token] = func
-            return func
-
-        return _decorator
 
     @staticmethod
     def format(fmt: str, metrics: "_Metrics | None" = None, *, enable_units: bool = False) -> str:
@@ -265,8 +285,10 @@ class PlaceholderFormatter(QObject):
                 else:
                     _tk, _sp = _buffer, ""
                 _spec = False
-                if _tk in PlaceholderFormatter._TOKENS:
-                    final += PlaceholderFormatter._TOKENS[_tk](metrics, _sp)
+                if PlaceholderFormatter._trace_tokens:
+                    PlaceholderFormatter._traced_tokens.add(_tk)
+                if _tk in _TOKENS:
+                    final += _TOKENS[_tk].call(metrics, _sp)
                 elif enable_units and _tk in _UNIT_TOKENS:
                     final += _UNIT_TOKENS[_tk](metrics, _sp)
                 elif _sp:
@@ -294,13 +316,12 @@ class PlaceholderFormatter(QObject):
         return final + _buffer  # flush any trailing literal text
 
 
-register_token = PlaceholderFormatter.register_token
 _format = PlaceholderFormatter.format
 
 
 # region time related tokens
-@register_token("time")
-def _time(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("time", metrics_required=True, spec_required=True)
+def _time(m: _Metrics, spec: str) -> str:
     # m.dt = datetime.now()
     return _format(spec, m, enable_units=True) if spec else m.dt.isoformat(timespec="seconds")
 
@@ -309,46 +330,55 @@ def _time(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunctio
 
 
 # region app.*
-@register_token("app.name")
-def _app_name(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("app.name", metrics_required=True, spec_required=True)
+def _app_name(m: _Metrics, spec: str) -> str:
     from constants import APPLICATION_NAME as AN
 
     m.str_ = AN
     return _format(spec, m, enable_units=True) if spec else m.str_
 
 
-@register_token("app.version")
-def _app_version(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("app.version", metrics_required=True, spec_required=True)
+def _app_version(m: _Metrics, spec: str) -> str:
     from constants import VERSION as V
 
     m.v = V
     return _format(spec, m, enable_units=True) if spec else str(V)
 
 
-@register_token("app.build", "is not implemented. my be moved to {app.version} in future.")
-def _app_build(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "app.build",
+    placeholder="is not implemented. my be moved to {app.version} in future.",
+)
+def _app_build() -> str:
     return "{app.build} is not implemented. may be moved to {app.version} in future."
 
 
-@register_token("app.channel", "is not implemented. my be moved to {app.version} in future.")
-def _app_channel(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "app.channel",
+    placeholder="is not implemented. my be moved to {app.version} in future.",
+)
+def _app_channel() -> str:
     return "{app.channel} is not implemented. may be moved to {app.version} in future."
 
 
-@register_token("app.env", "is not implemented. my be moved to {app.version} in future.")
-def _app_env(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "app.env",
+    placeholder="is not implemented. my be moved to {app.version} in future.",
+)
+def _app_env() -> str:
     return "{app.env} is not implemented. may be moved to {app.version} in future."
 
 
 @register_token("app.pid")
-def _app_pid(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+def _app_pid() -> str:
     import os
 
     return str(os.getpid())
 
 
-@register_token("app.uptime")
-def _app_uptime(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("app.uptime", metrics_required=True, spec_required=True)
+def _app_uptime(m: _Metrics, spec: str) -> str:
     from constants import APP_STARTED_TIME
 
     delta = datetime.now() - APP_STARTED_TIME
@@ -356,34 +386,44 @@ def _app_uptime(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedF
     return _format(spec, m, enable_units=True) if spec else _humanize_duration(delta)
 
 
-@register_token("app.result_count")
-def _app_result_count(_: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
-    return str(MutableAppDetails.result_count)
-
-
 # endregion
 
 
 # region update.* # TODO
-@register_token("update.available", "is not implemented yet.")
-def _update_available(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "update.available",
+    placeholder="is not implemented yet.",
+    metrics_required=True,
+    spec_required=True,
+)
+def _update_available(m: _Metrics, spec: str) -> str:
     m.b = False
     return _format(spec, m, enable_units=True) if spec else ("Yes" if m.b else "No")
 
 
-@register_token("update.latest_version", "is not implemented yet.")
-def _update_latest_version(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "update.latest_version",
+    placeholder="is not implemented yet.",
+    metrics_required=True,
+    spec_required=True,
+)
+def _update_latest_version(m: _Metrics, spec: str) -> str:
     m.v = Version("")
     return _format(spec, m, enable_units=True) if spec else str(m.v)
 
 
-@register_token("update.channel", "is not implemented yet.")
-def _update_channel(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("update.channel", placeholder="is not implemented yet.")
+def _update_channel() -> str:
     raise NotImplementedError
 
 
-@register_token("update.download_progress", "is not implemented yet.")
-def _update_download_progress(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "update.download_progress",
+    placeholder="is not implemented yet.",
+    metrics_required=True,
+    spec_required=True,
+)
+def _update_download_progress(m: _Metrics, spec: str) -> str:
     from typing import cast
 
     downloaded = u_progress = cast(float | None, None)
@@ -401,8 +441,13 @@ def _update_download_progress(m: _Metrics, spec: str) -> str:  # pyright: ignore
     raise ValueError(f"Unknown unit {unit!r} for update.download_progress")
 
 
-@register_token("update.last_checked", "is not implemented yet.")
-def _update_last_checked(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "update.last_checked",
+    placeholder="is not implemented yet.",
+    metrics_required=True,
+    spec_required=True,
+)
+def _update_last_checked(m: _Metrics, spec: str) -> str:
     m.dt = datetime.now()
     return _format(spec, m, enable_units=True) if spec else m.dt.isoformat(timespec="seconds")
 
@@ -411,28 +456,28 @@ def _update_last_checked(m: _Metrics, spec: str) -> str:  # pyright: ignore[repo
 
 
 # region notifications.*
-@register_token("notifications.count", "is not implemented yet.")
-def _notifications_count(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("notifications.count", placeholder="is not implemented yet.")
+def _notifications_count() -> str:
     return "N/A"
 
 
-@register_token("notifications.unread", "is not implemented yet.")
-def _notifications_unread(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("notifications.unread", placeholder="is not implemented yet.")
+def _notifications_unread() -> str:
     return "N/A"
 
 
-@register_token("notifications.latest", "is not implemented yet.")
-def _notifications_latest(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("notifications.latest", placeholder="is not implemented yet.")
+def _notifications_latest() -> str:
     return "N/A"
 
 
-@register_token("notifications.latest_time", "is not implemented yet.")
-def _notifications_latest_time(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("notifications.latest_time", placeholder="is not implemented yet.")
+def _notifications_latest_time() -> str:
     return "N/A"
 
 
-@register_token("notifications.priority", "is not implemented yet.")
-def _notifications_priority(_m: _Metrics, _spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("notifications.priority", placeholder="is not implemented yet.")
+def _notifications_priority() -> str:
     return "N/A"
 
 
@@ -458,8 +503,8 @@ def _get_user_logon_time():
         return None
 
 
-@register_token("session.duration")
-def _session_duration(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("session.duration", metrics_required=True, spec_required=True)
+def _session_duration(m: _Metrics, spec: str) -> str:
     lt = _get_user_logon_time()
     if lt is None:
         return "N/A"
@@ -469,8 +514,8 @@ def _session_duration(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportU
     return _format(spec, m, enable_units=True) if spec else _humanize_duration(delta)
 
 
-@register_token("session.login_time")
-def _session_login_time(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("session.login_time", metrics_required=True, spec_required=True)
+def _session_login_time(m: _Metrics, spec: str) -> str:
     lt = _get_user_logon_time()
     if lt is None:
         return "N/A"
@@ -479,8 +524,8 @@ def _session_login_time(m: _Metrics, spec: str) -> str:  # pyright: ignore[repor
     return _format(spec, m, enable_units=True) if spec else lt.isoformat(timespec="seconds")
 
 
-@register_token("session.username")
-def _session_username(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("session.username", metrics_required=True, spec_required=True)
+def _session_username(m: _Metrics, spec: str) -> str:
     import getpass
 
     m.str_ = getpass.getuser()
@@ -539,14 +584,14 @@ def _get_system_metrics() -> _SystemMetrics:
         upload = download = 0.0
     _NET_PREV = (now, net_sent, net_recv)  # pyright: ignore[reportConstantRedefinition]
 
-    battery = psutil.sensors_battery()
+    battery = psutil.sensors_battery()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     metrics = _SystemMetrics(
         os=platform.system(),
         arch=platform.machine(),
         hostname=platform.node(),
         cpu_usage=psutil.cpu_percent(None),
-        memory_usage=psutil.virtual_memory().percent,
-        battery=None if battery is None else round(battery.percent),
+        memory_usage=psutil.virtual_memory().percent,  # pyright: ignore[reportAny]
+        battery=None if battery is None else round(battery.percent),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         net_sent=net_sent,
         net_recv=net_recv,
         net_upload_speed=upload,
@@ -557,38 +602,38 @@ def _get_system_metrics() -> _SystemMetrics:
     return metrics
 
 
-@register_token("system.os")
-def _system_os(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.os", metrics_required=True, spec_required=True)
+def _system_os(m: _Metrics, spec: str) -> str:
     m.str_ = _get_system_metrics().os
     return _format(spec, m, enable_units=True) if spec else m.str_
 
 
-@register_token("system.arch")
-def _system_arch(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.arch", metrics_required=True, spec_required=True)
+def _system_arch(m: _Metrics, spec: str) -> str:
     m.str_ = _get_system_metrics().arch
     return _format(spec, m, enable_units=True) if spec else m.str_
 
 
-@register_token("system.hostname")
-def _system_hostname(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.hostname", metrics_required=True, spec_required=True)
+def _system_hostname(m: _Metrics, spec: str) -> str:
     m.str_ = _get_system_metrics().hostname
     return _format(spec, m, enable_units=True) if spec else m.str_
 
 
-@register_token("system.cpu_usage")
-def _system_cpu_usage(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.cpu_usage", metrics_required=True, spec_required=True)
+def _system_cpu_usage(m: _Metrics, spec: str) -> str:
     m.f = _get_system_metrics().cpu_usage
     return _format(spec, m, enable_units=True) if spec else f"{m.f:.1f}%"
 
 
-@register_token("system.memory_usage")
-def _system_memory_usage(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.memory_usage", metrics_required=True, spec_required=True)
+def _system_memory_usage(m: _Metrics, spec: str) -> str:
     m.f = _get_system_metrics().memory_usage
     return _format(spec, m, enable_units=True) if spec else f"{m.f:.1f}%"
 
 
-@register_token("system.battery")
-def _system_battery(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.battery", metrics_required=True, spec_required=True)
+def _system_battery(m: _Metrics, spec: str) -> str:
     battery = _get_system_metrics().battery
     if battery is None:
         return "N/A"
@@ -596,23 +641,23 @@ def _system_battery(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnu
     return _format(spec, m, enable_units=True) if spec else f"{battery}%"
 
 
-@register_token("system.network.sent")
-def _system_net_sent(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.network.sent", metrics_required=True, spec_required=True)
+def _system_net_sent(m: _Metrics, spec: str) -> str:
     return _format_net(m, spec, _get_system_metrics().net_sent)
 
 
-@register_token("system.network.recv")
-def _system_net_recv(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.network.recv", metrics_required=True, spec_required=True)
+def _system_net_recv(m: _Metrics, spec: str) -> str:
     return _format_net(m, spec, _get_system_metrics().net_recv)
 
 
-@register_token("system.network.upload")
-def _system_net_upload(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.network.upload", metrics_required=True, spec_required=True)
+def _system_net_upload(m: _Metrics, spec: str) -> str:
     return _format_net(m, spec, _get_system_metrics().net_upload_speed, speed=True)
 
 
-@register_token("system.network.download")
-def _system_net_download(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.network.download", metrics_required=True, spec_required=True)
+def _system_net_download(m: _Metrics, spec: str) -> str:
     return _format_net(m, spec, _get_system_metrics().net_download_speed, speed=True)
 
 
@@ -623,14 +668,19 @@ def _format_net(m: _Metrics, spec: str, value: int | float, *, speed: bool = Fal
     return f"{text}/s" if speed else text
 
 
-@register_token("system.network_status", "is not implemented yet.")
-def _system_network_status(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token(
+    "system.network_status",
+    placeholder="is not implemented yet.",
+    metrics_required=True,
+    spec_required=True,
+)
+def _system_network_status(m: _Metrics, spec: str) -> str:
     m.b = False
     return _format(spec, m, enable_units=True) if spec else "ConnectionType" if False else "Offline"
 
 
-@register_token("system.uptime")
-def _system_uptime(m: _Metrics, spec: str) -> str:  # pyright: ignore[reportUnusedFunction]
+@register_token("system.uptime", metrics_required=True, spec_required=True)
+def _system_uptime(m: _Metrics, spec: str) -> str:
     delta = datetime.now() - _get_system_metrics().boot_time
     m.d = delta
     return _format(spec, m, enable_units=True) if spec else _humanize_duration(delta)

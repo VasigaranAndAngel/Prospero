@@ -19,8 +19,8 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
-from data_objects import MutableAppDetails
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
+from query_placeholder_tokens import register_query_placeholder_token, token_update
 from shared_ui_elements import AnimatedVBoxLayout
 from theme import theme
 from updater import GithubLatestRelease
@@ -135,6 +135,11 @@ class MainWindow(QWidget):
         self._update_pos()  # for update the position from config for the first time
         _ = self._result_update.connect(self._update_results_box)
 
+        @register_query_placeholder_token("app.result_count")
+        def _result_count_token() -> str:
+            return str(len(self._current_results))
+        token_update("app.result_count")  # update for the first time.
+
     def _on_query_update(self, query: str) -> None:
         self._current_results = tuple()
         search_async(query, self._update_results)
@@ -156,6 +161,7 @@ class MainWindow(QWidget):
             # Only update if results are empty or new results has changes.
             self._current_results = new_results
             self._result_update.emit()
+        token_update("app.result_count")
 
     def _update_results_box(self) -> None:
         self._result_boxes.clear()
@@ -207,7 +213,6 @@ class MainWindow(QWidget):
 
         # Add new widgets
         layout.setWidgets(self._result_boxes)
-        MutableAppDetails.result_count = len(self._result_boxes)
 
         # Set window's size
         widget.adjustSize()

@@ -45,7 +45,7 @@ class QueryBox(QLineEdit):
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
         )
         self._placeholder_txt: str = ""
-        self._placeholder_formatter: PhF = PhF("{time:{h}:{mm}:{ss} {A}}", self)
+        self._placeholder_formatter: PhF = PhF(r"{time:{h}:{mm}:{ss} {A}}", self)
         "Placeholder formatter."
 
         # Initialize placeholder based on the configured _placeholder value
@@ -99,13 +99,15 @@ class QueryBox(QLineEdit):
         self.repaint()
 
     def _update_placeholder(self, text: str = "") -> None:
+        old_txt = self._placeholder
         if isinstance(self._placeholder, str):
             self._placeholder_txt = self._placeholder
         elif self._placeholder:
             self._placeholder_txt = text
         else:
             self._placeholder_txt = ""
-        self.repaint()
+        if old_txt != self._placeholder_txt:
+            self.repaint()
 
     def _update_suggestion(self, new_txt: str | None = None) -> None:
         sug = self._suggestion
