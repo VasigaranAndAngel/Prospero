@@ -89,6 +89,173 @@ class Color(_ColorAideColor):
         """
         return _color_names.to_name(list(self.convert("srgb")[:]))
 
+    def contrast_ratio(self, other: "Color") -> float:
+        """Returns WCAG contrast ratio between this and another color.
+
+        Uses ColorAide's contrast calculation (1.0..21.0 for sRGB).
+
+        Args:
+            other (Color): The color to compare against.
+
+        Returns:
+            float: Contrast ratio.
+        """
+        return float(self.contrast(other))
+
+    def relative_luminance(self) -> float:
+        """Relative luminance (WCAG) for this color.
+
+        Returns:
+            float: Luminance value (0.0=black, ~1.0=white).
+        """
+        return float(self.luminance())
+
+    def text_color(self, candidates: tuple["Color", ...] | None = None) -> "Color":
+        """Returns the best contrasting text color from candidates against this background.
+
+        Defaults to white and black. Chooses the candidate with highest contrast ratio.
+
+        Args:
+            candidates (tuple[Color, ...] | None): Candidate text colors. Defaults to (white, black).
+
+        Returns:
+            Color: The candidate with highest contrast.
+        """
+        if candidates is None:
+            candidates = (Color("white"), Color("black"))
+
+        best = candidates[0]
+        best_ratio = float(self.contrast(best))
+        for c in candidates[1:]:
+            ratio = float(self.contrast(c))
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best = c
+        return best
+
+    def is_readable(self, other: "Color", level: str = "AA", size: str = "body") -> bool:
+        """Check WCAG readability between this and another color.
+
+        Args:
+            other (Color): The other color (usually foreground against background; order doesn't affect threshold check by value).
+            level (str): "AA" or "AAA".
+            size (str): "body" or "large" (affects thresholds).
+
+        Returns:
+            bool: True if contrast meets WCAG threshold.
+        """
+        ratio = float(self.contrast(other))
+        level_norm = level.upper()
+        size_norm = size.lower()
+
+        if level_norm == "AA":
+            if size_norm == "large":
+                return ratio >= 3.0
+            return ratio >= 4.5
+        if level_norm == "AAA":
+            if size_norm == "large":
+                return ratio >= 4.5
+            return ratio >= 7.0
+        return ratio >= 4.5
+
+    def delta_e2000(self, other: "Color") -> float:
+        """Delta E (CIEDE2000) distance to another color.
+
+        Returns:
+            float: Delta E 2000 value.
+        """
+        return float(self.delta_e(other, method="2000"))
+
+    def lighten(self, amount: float = 0.1) -> "Color":
+        """Lighten color by increasing HSL lightness.
+
+        Args:
+            amount (float): Amount to increase lightness (0..1). Defaults to 0.1.
+
+        Returns:
+            Color: Lightened color.
+        """
+        hsl = self.convert("hsl")
+        new_l = max(0.0, min(1.0, float(hsl["lightness"]) + amount))
+        return hsl.set("lightness", new_l).convert("srgb")
+
+    def darken(self, amount: float = 0.1) -> "Color":
+        """Darken color by decreasing HSL lightness.
+
+        Args:
+            amount (float): Amount to decrease lightness (0..1). Defaults to 0.1.
+
+        Returns:
+            Color: Darkened color.
+        """
+        return self.lighten(-amount)
+
+    def saturate(self, amount: float = 0.1) -> "Color":
+        """Increase saturation in HSL.
+
+        Args:
+            amount (float): Amount to increase saturation (0..1). Defaults to 0.1.
+
+        Returns:
+            Color: Saturated color.
+        """
+        hsl = self.convert("hsl")
+        new_s = max(0.0, min(1.0, float(hsl["saturation"]) + amount))
+        return hsl.set("saturation", new_s).convert("srgb")
+
+    def desaturate(self, amount: float = 0.1) -> "Color":
+        """Decrease saturation in HSL.
+
+        Args:
+            amount (float): Amount to decrease saturation (0..1). Defaults to 0.1.
+
+        Returns:
+            Color: Desaturated color.
+        """
+        return self.saturate(-amount)
+
+    def tint(self, amount: float = 0.1) -> "Color":
+        """Tint by mixing with white."""
+        return self.mix(Color("white"), amount).convert("srgb")
+
+    def shade(self, amount: float = 0.1) -> "Color":
+        """Shade by mixing with black."""
+        return self.mix(Color("black"), amount).convert("srgb")
+
+    def spin(self, degrees: float) -> "Color":
+        """Rotate hue by degrees (0-360)."""
+        hsl = self.convert("hsl")
+        hue = float(hsl["hue"])
+        if math.isnan(hue):
+            hue = 0.0
+        hue = (hue + degrees) % 360.0
+        return hsl.set("hue", hue).convert("srgb")
+
+    def complementary(self) -> tuple["Color", ...]:
+        """Complementary color (180 degrees)."""
+        return (self, self.spin(180.0))
+
+    def triadic(self) -> tuple["Color", ...]:
+        """Triadic colors (120° apart)."""
+        return (self, self.spin(120.0), self.spin(240.0))
+
+    def tetradic(self) -> tuple["Color", ...]:
+        """Tetradic (square) colors."""
+        return (self, self.spin(90.0), self.spin(180.0), self.spin(270.0))
+
+    def split_complementary(self) -> tuple["Color", ...]:
+        """Split complementary (this + 150° + 210°)."""
+        return (self, self.spin(150.0), self.spin(210.0))
+
+    def analogous(self, count: int = 3, step: float = 30.0) -> tuple["Color", ...]:
+        """Analogous colors around this hue."""
+        count = max(1, int(count))
+        half = (count - 1) // 2
+        result: list["Color"] = []
+        for i in range(-half, count - half):
+            result.append(self.spin(i * step))
+        return tuple(result)
+
     def to_qcolor(self) -> "QColor":
         """Converts to a QColor, clipping to the sRGB gamut.
 
