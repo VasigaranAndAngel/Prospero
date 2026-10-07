@@ -26,6 +26,7 @@ from theme import theme
 from updater import GithubLatestRelease
 
 from ._corner_mas_overlay import CornerMaskOverlay
+from ._focused_result_bar import FocusResultBar
 from ._query_box import QueryBox
 from ._results_box import ResultsBox
 
@@ -39,6 +40,9 @@ class ResultsBoxContainer(QWidget):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
         self._old_size_hint: QSize = self.sizeHint()
+        self.focus_bar: FocusResultBar = FocusResultBar(4, self)
+        self.focus_bar.move(4, 0)
+        self.focus_bar.show()
 
     @override
     def event(self, event: QEvent, /) -> bool:
@@ -50,6 +54,7 @@ class ResultsBoxContainer(QWidget):
     @override
     def resizeEvent(self, event: QResizeEvent, /) -> None:
         super().resizeEvent(event)
+        self.focus_bar.setFixedHeight(event.size().height())
         if self._old_size_hint != (x := self.sizeHint()):
             self._old_size_hint = x
             self.size_hint_changed.emit(event.size())
@@ -100,6 +105,7 @@ class MainWindow(QWidget):
         self._results_box.setWidgetResizable(True)
         wid.setLayout(lay := AnimatedVBoxLayout(wid, 200, QEasingCurve.Type.OutExpo))
         _ = wid.size_hint_changed.connect(self._update_size)
+        _ = wid.size_hint_changed.connect(self._update_focus_bar)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
@@ -138,6 +144,7 @@ class MainWindow(QWidget):
         @register_query_placeholder_token("app.result_count")
         def _result_count_token() -> str:
             return str(len(self._current_results))
+
         token_update("app.result_count")  # update for the first time.
 
     def _on_query_update(self, query: str) -> None:
@@ -248,6 +255,9 @@ class MainWindow(QWidget):
         # raise the mask widget to the top
         self._corner_mask.raise_()
 
+        # update focus bar
+        self._update_focus_bar()
+
     def _on_width_anim_finished(self) -> None:
         if self._close:
             _ = self.close()
@@ -275,6 +285,7 @@ class MainWindow(QWidget):
 
         self._result_boxes[self._shadow_focused_idx].set_shadow_focus(True)
         self._scroll_results_if_needed()
+        self._update_focus_bar()
 
     def _scroll_results_if_needed(self) -> None:
         if (sf_idx := self._shadow_focused_idx) is None:
@@ -333,6 +344,21 @@ class MainWindow(QWidget):
 
     def _update_loading_state(self) -> None:
         self._query_box.set_loading_state(len(self._loading_requests) > 0)
+
+    def _update_focus_bar(self) -> None:
+        self._result_box_container.focus_bar.raise_()
+        sh_idx = self._shadow_focused_idx
+        if sh_idx is None or len(self._result_boxes) < sh_idx +1:
+            self._result_box_container.focus_bar.resize_bar(0)
+            return
+        focused_wid = self._result_boxes[sh_idx]
+        wid_geo = focused_wid.geometry()
+        # TODO: sometimes the widget is still in animated-moving to it's new position.
+        # getting the geometry before the animation is finished will place the focus bar on wrong positions.
+        # Use targetHintSize or targetGeometry (upcoming features) to detect it's end geometry.
+        wid_mid_pos = wid_geo.center().y()
+        self._result_box_container.focus_bar.resize_bar(wid_geo.height() - 40)
+        self._result_box_container.focus_bar.move_bar(wid_mid_pos)
 
     # region config updates
     def _update_pos(self, _: ChangeEvent | None = None) -> None:
