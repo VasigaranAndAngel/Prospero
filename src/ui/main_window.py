@@ -348,14 +348,11 @@ class MainWindow(QWidget):
     def _update_focus_bar(self) -> None:
         self._result_box_container.focus_bar.raise_()
         sh_idx = self._shadow_focused_idx
-        if sh_idx is None or len(self._result_boxes) < sh_idx +1:
+        if sh_idx is None or len(self._result_boxes) < sh_idx + 1:
             self._result_box_container.focus_bar.resize_bar(0)
             return
         focused_wid = self._result_boxes[sh_idx]
-        wid_geo = focused_wid.geometry()
-        # TODO: sometimes the widget is still in animated-moving to it's new position.
-        # getting the geometry before the animation is finished will place the focus bar on wrong positions.
-        # Use targetHintSize or targetGeometry (upcoming features) to detect it's end geometry.
+        wid_geo = focused_wid.property("target_geo") or focused_wid.geometry()
         wid_mid_pos = wid_geo.center().y()
         self._result_box_container.focus_bar.resize_bar(wid_geo.height() - 40)
         self._result_box_container.focus_bar.move_bar(wid_mid_pos)

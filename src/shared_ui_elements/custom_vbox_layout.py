@@ -190,6 +190,7 @@ class AnimatedVBoxLayout(QLayout):
             self._new_widgets.discard(widget)
             widget.setGeometry(target)  # place instantly, no animation
             return
+        _ = widget.setProperty("target_geo", target)
 
         anim = self._anims.get(widget)
         force = widget in self._force_anim_restart

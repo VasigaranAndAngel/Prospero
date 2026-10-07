@@ -6,9 +6,6 @@ from PySide6.QtWidgets import QWidget
 
 
 class FocusResultBar(QWidget):
-    _EASE_1: QEasingCurve = QEasingCurve(QEasingCurve.Type.OutExpo)
-    _EASE_2: QEasingCurve = QEasingCurve(QEasingCurve.Type.Linear)
-
     def __init__(self, width: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
@@ -35,11 +32,11 @@ class FocusResultBar(QWidget):
         self._point_1_anim.stop()
         self._point_2_anim.stop()
         if old > mid_y:
-            self._point_1_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
+            self._point_1_anim.setEasingCurve(QEasingCurve.Type.OutCirc)
             self._point_2_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         else:
             self._point_1_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
-            self._point_2_anim.setEasingCurve(QEasingCurve.Type.OutExpo)
+            self._point_2_anim.setEasingCurve(QEasingCurve.Type.OutCirc)
         self._adjust_points()
 
     def resize_bar(self, height: int) -> None:
