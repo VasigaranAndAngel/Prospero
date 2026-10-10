@@ -2,6 +2,54 @@
 
 <!-- version list -->
 
+## v0.1.0-alpha.5 (2026-10-10)
+
+### Bug Fixes
+
+- Focus bar moves to wrong places
+  ([`c756959`](https://github.com/VasigaranAndAngel/Prospero/commit/c7569590e08eb225f5667deed58b345bbee15061))
+
+- Restore isinstance narrowing in the update result widget
+  ([`ac7d3fc`](https://github.com/VasigaranAndAngel/Prospero/commit/ac7d3fc63b928c31c1eaa9d8d183153a96a37991))
+
+### Features
+
+- Allowlisted package manager with hash pinned wheels
+  ([`f5915e5`](https://github.com/VasigaranAndAngel/Prospero/commit/f5915e525acef5e1ff6da86c9a4e60df11367723))
+
+- An attempt to load recent files associated to it's app.
+  ([`98b6909`](https://github.com/VasigaranAndAngel/Prospero/commit/98b6909d9ab6779d2c54a39073d0fdfc38c35b9d))
+
+- Focus bar
+  ([`e4a4326`](https://github.com/VasigaranAndAngel/Prospero/commit/e4a4326e8506fdab0eed569356d5f6e56b7b196b))
+
+- Global color calculator base implementation.
+  ([`a5ba756`](https://github.com/VasigaranAndAngel/Prospero/commit/a5ba756dfea60a0aea53d0da8c4bbc2e2d943f49))
+
+- New placeholder token: app.result_count
+  ([`f8da8f8`](https://github.com/VasigaranAndAngel/Prospero/commit/f8da8f820c4a0cfed16f0f03fc7e91cef14a8a0b))
+
+- Removes duplicate .lnk files from app list.
+  ([`466834f`](https://github.com/VasigaranAndAngel/Prospero/commit/466834f8ef544649812ad4ffcc07a2e935f4939d))
+
+- Show simple suggestion in query box.
+  ([`8196720`](https://github.com/VasigaranAndAngel/Prospero/commit/81967203303fb459457d6540deda40dffaeaad97))
+
+- WCAG and few more color calculation implementation in color_calculator
+  ([`ec7a74b`](https://github.com/VasigaranAndAngel/Prospero/commit/ec7a74b9854c9018b8f06648c75582aca02bb13b))
+
+### Refactoring
+
+- Change config file path to ~/.config/Prospero/Prospero.toml
+  ([`b1ab8be`](https://github.com/VasigaranAndAngel/Prospero/commit/b1ab8be76a8df3e40ad187b4d20a46dd76b71653))
+
+- Network handling is generalized.
+  ([`d11345b`](https://github.com/VasigaranAndAngel/Prospero/commit/d11345bbd077a8c1bcc495439fcb5aa31fe0cc44))
+
+- Query box placeholder formatter and placeholder tokens
+  ([`f280cb7`](https://github.com/VasigaranAndAngel/Prospero/commit/f280cb772bf4d271fc87437c1a3eab7a741bd67d))
+
+
 ## v0.1.0-alpha.4 (2026-09-23)
 
 ### Features
