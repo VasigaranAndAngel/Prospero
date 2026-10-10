@@ -23,7 +23,9 @@ from .categories import (
     WindowGeometryCategory,
 )
 
-CONFIG_FILE_PATH = Path.home() / ".config" / (APPLICATION_NAME.title() + ".toml")
+CONFIG_FILE_PATH = (
+    Path.home() / ".config" / APPLICATION_NAME.title() / (APPLICATION_NAME.title() + ".toml")
+)
 
 
 class Configs(BaseSettings):
