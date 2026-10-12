@@ -8,9 +8,10 @@
   A fast, keyboard-driven launcher for Windows.
 </p>
 
-Prospero is a small app that sits quietly in the background and opens the moment you need it. Press a hotkey, start typing, and it searches everything at once: the apps on your computer, a calculator, and a set of built-in commands. Results appear instantly, and the best match is always selected for you. Press Enter to run it, or use the arrow keys to pick a different one.
+Prospero is a small app that sits quietly in the background and opens the moment you need it. Yet another launcher but with a different approach.
 
-It is still young and under active development, but the core launcher is already usable day to day.
+> [!WARNING]
+> It is still young and under active development, but the core launcher is already usable day to day.
 
 > New here? Take a look at [FEATURES.md](docs/FEATURES.md) for the full list of what works today, what is being built, and what is planned.
 
@@ -34,14 +35,14 @@ It is still young and under active development, but the core launcher is already
 
 ## Quick start
 
-**Option 1 — installer (recommended)**
+**Option 1: installer (recommended)**
 
 1. Go to the [Releases](https://github.com/VasigaranAndAngel/Prospero/releases) page.
 2. Download the latest `ProsperoSetup-*.exe`.
 3. Run the installer, then launch Prospero.
 4. Press `Alt + Space` anywhere to open it.
 
-**Option 2 — run from source**
+**Option 2: run from source**
 
 You need Windows and Python >=3.12. The project uses [uv](https://docs.astral.sh/uv/) for dependencies.
 
@@ -67,25 +68,24 @@ uv run python -m src.main
 Full details, examples, and developer notes for every item live in [FEATURES.md](docs/FEATURES.md).
 
 **Search & launcher**
-- Global hotkey, always-on-top window, and tray icon — *implemented*
-- Fast fuzzy search across all providers at once — *implemented*
-- Every provider searches on its own thread, with a loading indicator — *implemented*
+- Fuzzy search — *implemented*
 
 **Providers**
-- Calculator: math, units, multiple sums, variables — *implemented* | *More planned*
-- Applications: launch Start Menu and UWP apps, optional recent files — *implemented* | *More Planned*
-- Commands: power options, updater, version, etc. — *implemented* | *More planned*
-- Color, File System, Volume, Terminal, Clipboard and more — *planned*
+- **Calculator**: math, units, multiple sums, variables — *implemented* | *More planned*
+- **Applications**: launch Start Menu and UWP apps, optional recent files — *Partially implemented* | *More Planned*
+- **Commands**: power options, updater, version, etc. — *implemented* | *More planned*
+- **Color**, **File System**, **Volume**, **Terminal**, **Clipboard** and more — *planned*
 
 **Look & feel**
-- System / Dark / Light mode and custom TOML themes — *Partially implemented*
-- Highly customizable query box placeholders with time, app, and system info — *Partially implemented*
+- System / Dark / Light mode and custom TOML themes — *Not implemented*
+- Highly customizable query box placeholder with time, app, and system info — *Partially implemented*
 - Settings window — *Under construction*
 - Customizable look and animations — *Planned*
 
 **Under the hood**
 - TOML config file that reloads when it changes — *Partially implemented*
 - Command-line arguments for config, theme, debug, offline, and more — *Partially implemented*
+- CLI mode for the one who need it — *Partially implemented*
 - Auto-updater from GitHub releases — *implemented*
 - Grammar, Tags and aliases, Query preset, VIM mode — *planned*
 
@@ -122,7 +122,7 @@ prospero [options]
 ## Build & development
 
 ```powershell
-# install everything (including dev tools)
+# install everything (including dev tools if needed)
 uv sync --locked --all-extras --dev
 
 # run the tests
@@ -134,4 +134,4 @@ uv run PyInstaller prospero.spec --clean --noconfirm
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE) with ❤️.
