@@ -7,7 +7,7 @@ from query_placeholder_tokens import (
 )
 
 from .._base_provider import BaseProvider
-from ..base_result_and_widgets import BaseResult, ExecutionAction
+from ..base_result import BaseResult, ExecutionAction
 from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
 
 

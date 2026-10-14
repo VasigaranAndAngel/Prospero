@@ -12,9 +12,10 @@ from helpers import SingletonQObjectMeta
 # class at runtime, but GithubFetchError is a class attribute, and a type checker cannot
 # use an attribute to narrow an isinstance check.
 from network import NetworkError
+from shared_ui_elements import ResultBox
 from updater import Downloaded, GithubLatestRelease, Updater
 
-from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultBox
+from ..base_result import BaseResult, ExecutionAction
 
 
 def readable_size(num: float):

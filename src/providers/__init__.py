@@ -15,13 +15,7 @@ from arg_parser import args
 from ._base_provider import BaseProvider
 from ._loading_request import LoadingRequest
 from .application_provider import AppProvider
-from .base_result_and_widgets import (
-    BaseResult,
-    BaseResultBoxWidget,
-    ExecutionAction,
-    ResultAttributes,
-    ResultBox,
-)
+from .base_result import BaseResult, ExecutionAction, ResultAttributes
 from .calculator_provider import CalcProvider
 from .command_provider import CommandProvider
 from .debug_provider import DebugProvider
@@ -104,10 +98,8 @@ __all__ = [
     "PROVIDERS_I",
     "DISABLED_PROVIDERS",
     "BaseResult",
-    "BaseResultBoxWidget",
     "ExecutionAction",
     "ResultAttributes",
-    "ResultBox",
     "LoadingRequest",
     "search",
     "search_async",

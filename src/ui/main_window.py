@@ -19,9 +19,9 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
-from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
+from providers import BaseResult, LoadingRequest, search_async
 from query_placeholder_tokens import register_query_placeholder_token, token_update
-from shared_ui_elements import AnimatedVBoxLayout
+from shared_ui_elements import AnimatedVBoxLayout, BaseResultBoxWidget, ResultBox
 from theme import theme
 from updater import GithubLatestRelease
 

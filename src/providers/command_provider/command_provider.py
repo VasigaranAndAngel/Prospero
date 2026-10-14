@@ -9,11 +9,11 @@ from typing import TYPE_CHECKING, Literal, overload, override
 from constants import APPLICATION_NAME, VERSION
 from fuzzy_finder import BaseChoice, IncrementalMatcher
 from helpers import task_schedule_handler
+from shared_ui_elements import BaseResultBoxWidget
 
 from .._base_provider import BaseProvider
-from ..base_result_and_widgets import (
+from ..base_result import (
     BaseResult,
-    BaseResultBoxWidget,
     ExecutionAction,
     ResultAttributes,
 )
@@ -138,7 +138,7 @@ class CommandProvider(BaseProvider):
                 description=command.description,
                 result_widget_factory=command.result_widget_factory,
                 func=command,
-                attributes=ResultAttributes(suggestion_request=name)
+                attributes=ResultAttributes(suggestion_request=name),
             )
             for name, command in _COMMANDS.items()
         ]

@@ -5,7 +5,7 @@ from typing import override
 from global_threading import THREAD_POOL
 
 from ._loading_request import LoadingRequest
-from .base_result_and_widgets import BaseResult
+from .base_result import BaseResult
 
 
 class BaseProvider(ABC):

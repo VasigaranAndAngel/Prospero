@@ -9,7 +9,7 @@ from helpers import task_schedule_handler
 
 from ._base_provider import BaseProvider
 from ._loading_request import LoadingRequest
-from .base_result_and_widgets import BaseResult, ExecutionAction
+from .base_result import BaseResult, ExecutionAction
 
 logger = logging.getLogger(__name__)
 

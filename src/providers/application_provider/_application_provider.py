@@ -11,7 +11,7 @@ from fuzzy_finder import BaseChoice, IncrementalMatcher
 
 from .._base_provider import BaseProvider
 from .._loading_request import LoadingRequest
-from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultAttributes
+from ..base_result import BaseResult, ExecutionAction, ResultAttributes
 from ._get_app_details import AppDetail, AppDetailsFetcher
 
 logger = logging.getLogger(__name__)

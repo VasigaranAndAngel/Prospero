@@ -1,17 +1,5 @@
-"""BaseResult model, BaseResultBoxWidget, and ResultBox are implemented in here.
-
-Tried moving ui related codes to separate shared modules and faced circular import issues. The final
-decision is to put all related codes in same file. Now BaseResultBoxWidget and ResultBox widgets are
-exported from providers.
-"""
-
-from abc import ABC, abstractmethod
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import override
 
-# TODO: This module will be imported on cli mode too. which imports unwanted PySide6
 from PySide6.QtCore import QEasingCurve, QMetaObject, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import (
     QColor,
@@ -24,61 +12,19 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from data_objects import IconLoadMethod, LoadMethod
-from shared_ui_elements import Icon
+from providers import BaseResult, ExecutionAction
 
-
-class ExecutionAction(Enum):
-    Trigger = auto()
-    "The main trigger from KeyPress Enter or Mouse DoubleClick."
-    Expand = auto()
-    "More options trigger which tells the ResultBox to show more options/contexts."
-
-
-@dataclass
-class ResultAttributes:
-    highlight_request: None = None
-    "If need to highlight anything in query."
-    suggestion_request: None | str = None
-    "If anything is there to show as query suggestion."
-    coloring_request: None = None
-    "If need to colorized anything in query."
-    close_after_enter: bool = False
-
-
-@dataclass(kw_only=True)
-class BaseResult(ABC):
-    text: str
-    score: int = 0
-    highlighted_indexes: list[int] = field(default_factory=list)
-    description: str | None = None
-    attributes: ResultAttributes = field(default_factory=ResultAttributes)
-    icon_load_method: IconLoadMethod = IconLoadMethod(LoadMethod.default)
-    result_widget_factory: Callable[[str, "BaseResult"], "BaseResultBoxWidget"] | None = None
-
-    def highlighted(self, open_tag: str = "**", close_tag: str = "**") -> str:
-        ih = set(self.highlighted_indexes)
-        return "".join(
-            [f"{open_tag}{c}{close_tag}" if i in ih else f"{c}" for i, c in enumerate(self.text)]
-        )
-
-    @abstractmethod
-    def execute(self, action: ExecutionAction) -> None:
-        raise NotImplementedError
-
-    @override
-    def __hash__(self) -> int:
-        return hash(self.text + (self.description or ""))
+from .icon import Icon
 
 
 class BaseResultBoxWidget(QWidget):
     focus_request: Signal = Signal(QWidget)
 
-    def __init__(self, text: str, result: BaseResult, /, parent: QWidget | None = None) -> None:
+    def __init__(self, text: str, result: "BaseResult", /, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
         self._text: str = text
-        self.result: BaseResult = result
+        self.result: "BaseResult" = result
         self.shadow_focus: bool = False
         self.description: str | None = result.description
         self.focus_request_connection: QMetaObject.Connection | None = None
@@ -99,10 +45,10 @@ class BaseResultBoxWidget(QWidget):
         """
         self.deleteLater()
 
-    def execute_execution_action(self, action: ExecutionAction) -> None:
+    def execute_execution_action(self, action: "ExecutionAction") -> None:
         self.result.execute(action)
 
-    def update_result(self, new_result: BaseResult) -> None:
+    def update_result(self, new_result: "BaseResult") -> None:
         self.result = new_result
 
     @override
@@ -125,7 +71,7 @@ class BaseResultBoxWidget(QWidget):
 
 
 class ResultBox(BaseResultBoxWidget):
-    def __init__(self, text: str, result: BaseResult, /, parent: QWidget | None = None) -> None:
+    def __init__(self, text: str, result: "BaseResult", /, parent: QWidget | None = None) -> None:
         super().__init__(text, result, parent)
 
         self.setFixedHeight(60)
@@ -182,7 +128,7 @@ class ResultBox(BaseResultBoxWidget):
             self.set_description(self.result.description)
 
     @override
-    def update_result(self, new_result: BaseResult) -> None:
+    def update_result(self, new_result: "BaseResult") -> None:
         super().update_result(new_result)
         self._reflect_result()
 
@@ -228,6 +174,3 @@ class ResultBox(BaseResultBoxWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(self.property("_bg_color"))  # pyright: ignore[reportAny]
             p.drawRect(self.rect().adjusted(0, 0, -1, -1))
-
-
-__all__ = ["ExecutionAction", "ResultAttributes", "BaseResult", "BaseResultBoxWidget", "ResultBox"]
