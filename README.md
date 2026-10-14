@@ -4,11 +4,10 @@
 
 <h1 align="center">Prospero</h1>
 
-<p align="center">
-  A fast, keyboard-driven launcher for Windows.
-</p>
 
-Prospero is a small app that sits quietly in the background and opens the moment you need it. Yet another launcher but with a different approach.
+<p align="center">
+  A fast, keyboard-driven command palette — Your pocket magician for quick needs. Everything you need, the moment you need it, solved the way you need it.
+</p>
 
 > [!WARNING]
 > It is still young and under active development, but the core launcher is already usable day to day.
@@ -17,21 +16,7 @@ Prospero is a small app that sits quietly in the background and opens the moment
 
 <!-- ## Screenshots -->
 
-<!--
-  These are placeholders. Replace each file in docs/assets/ with a real screenshot
-  of the same name and the image will show up automatically.
--->
-
-<!--
-![Main window](docs/assets/placeholder.svg)
-*The main window: query box on top, results below.*
-
-![Calculator](docs/assets/placeholder.svg)
-*A calculation with units and a copy-to-clipboard result.*
-
-![Applications](docs/assets/placeholder.svg)
-*Searching for an app from the Start Menu.*
--->
+![Main window](docs/assets/main_window.gif)
 
 ## Quick start
 
