@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
+from platform_utils import IS_WINDOWS
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
 from query_placeholder_tokens import register_query_placeholder_token, token_update
 from shared_ui_elements import AnimatedVBoxLayout
@@ -432,6 +433,9 @@ class MainWindow(QWidget):
         self.setGeometry(x, y, width, height)
 
     def _force_foreground(self, hwnd: int):
+        if not IS_WINDOWS:
+            # X11/Wayland rely on the window manager; activateWindow() is the portable path.
+            return
         user32 = ctypes.windll.user32
         fg_hwnd = user32.GetForegroundWindow()  # pyright: ignore[reportAny]
         if not fg_hwnd:

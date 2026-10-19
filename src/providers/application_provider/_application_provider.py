@@ -28,8 +28,12 @@ class AppResult(BaseResult, BaseChoice):
         # os.startfile(self.start)
         if action is ExecutionAction.Trigger:
             logger.debug(f"Launching: {self.command}")
+            is_shell = isinstance(self.command, str)
             _ = subprocess.Popen(
-                self.command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True
+                self.command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=is_shell,
             )
 
     @override
@@ -58,7 +62,10 @@ class AppProvider(BaseProvider):
 
         choices: list[AppResult] = []
         for d in details:
-            if d.type == "uwp":
+            if d.exec_command is not None:
+                path_or_app_id = d.path
+                command: str | Sequence[str] = d.exec_command
+            elif d.type == "uwp":
                 path_or_app_id = d.app_id
                 command = f"start shell:appsFolder\\{path_or_app_id or ''}"
             elif d.type == "desktop":

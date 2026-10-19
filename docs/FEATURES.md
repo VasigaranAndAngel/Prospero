@@ -45,18 +45,19 @@ Every feature follows the same shape:
 
 ### Global hotkey _implemented_
 
-Press `Alt + Space` from anywhere in Windows to open Prospero or select all query.
-
+Press `Alt + Space` from anywhere to open Prospero or select all query.
 
 <details>
 <summary><b>How to use</b></summary>
 
 With Prospero running in the background, press `Alt + Space`. The window appears in front of whatever you are doing and the query box is focused, so you can start typing right away. Pressing `Esc` hides it.
 
+On Linux the hotkey works on X11 out of the box. On Wayland, whether a global shortcut can be captured (and whether the key can be swallowed) depends on the compositor; if it does not work, bind a compositor shortcut that runs `prospero`.
+
 <details>
 <summary><b>Developer notes</b></summary>
 
-The hotkey is handled by `src/hotkey_listener.py` using `pynput`. On Windows it installs a low-level event filter that watches for the left Alt key held while Space is pressed, emits a Qt signal, and suppresses the key so Windows does not also act on it. `src/main.py` connects that signal to show or hide the main window.
+The hotkey is handled by `src/hotkey_listener.py` using `pynput`. On Windows it installs a low-level event filter that watches for the left Alt key held while Space is pressed, emits a Qt signal, and suppresses the key so Windows does not also act on it. On other platforms pynput does not support suppressing events (on X11) so the plain listener is used and the key also reaches the focused window. `src/main.py` connects that signal to show or hide the main window.
 </details>
 </details>
 
@@ -136,7 +137,7 @@ Run Prospero inside a terminal instead of as a window.
 <details>
 <summary><b>How to use</b></summary>
 
-```powershell
+```sh
 prospero --cli
 ```
 
@@ -145,29 +146,29 @@ Type a query, press Enter to run the first result, and press `Ctrl + C` to quit.
 <details>
 <summary><b>Developer notes</b></summary>
 
-`main.cli()` in `src/main.py` renders results to stdout using ANSI codes and reads input with `msvcrt`. It reuses the same providers as the window, so both modes stay in sync.
+`main.cli()` in `src/main.py` renders results to stdout using ANSI codes and reads input with `msvcrt` on Windows and `termios`/`tty` elsewhere. It reuses the same providers as the window, so both modes stay in sync.
 </details>
 </details>
 
 ### Tray icon _implemented_
 
-Prospero lives in the Windows notification area while it is running.
+Prospero lives in the system tray while it is running.
 
 <details>
 <summary><b>How to use</b></summary>
 
-Look for the Prospero icon near the clock. It keeps the app in the background and gives a place to interact with it without the main window being open.
+Look for the Prospero icon in the notification area (Windows) or the status area (Linux). It keeps the app in the background and gives a place to interact with it without the main window being open.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-Created in `src/main.py` alongside the `QApplication`, using the icon files in `assets/icon/`.
+Created in `src/main.py` alongside the `QApplication`, using the icon files in `assets/icon/`. On Linux this needs a desktop with a status-notifier host; on GNOME you may need the AppIndicator extension.
 </details>
 </details>
 
 ### Auto start on login _implemented_
 
-Ask Windows to launch Prospero when you sign in, using the Task Scheduler.
+Ask the desktop to launch Prospero when you sign in.
 
 <details>
 <summary><b>How to use</b></summary>
@@ -177,7 +178,7 @@ Type `Add Prospero to Scheduled Tasks` and press Enter. To undo it, use `Remove 
 <details>
 <summary><b>Developer notes</b></summary>
 
-Handled by `src/helpers/windows_task_schedule_handler.py`, which registers a logon task. The commands live in the command provider.
+On Windows this is handled by `src/helpers/windows_task_schedule_handler.py`, which registers a logon task. On Linux it is handled by `src/helpers/linux_autostart.py`, which writes an XDG autostart entry to `~/.config/autostart/Prospero.desktop`. `src/helpers/__init__.py` picks the right module for the platform, and the commands live in the command provider.
 </details>
 </details>
 
@@ -625,17 +626,17 @@ The application provider finds and launches programs on your computer.
 
 ### Launch applications _implemented_
 
-Find desktop apps (Start Menu shortcuts) and Microsoft Store / UWP apps and open them.
+Find and open applications: Start Menu shortcuts and Microsoft Store / UWP apps on Windows, and `.desktop` entries on Linux.
 
 <details>
 <summary><b>How to use</b></summary>
 
-Start typing an app's name, pick it from the results, and press `Enter`. Both classic desktop shortcuts (`.lnk` files) and packaged apps are supported.
+Start typing an app's name, pick it from the results, and press `Enter`. On Windows both classic desktop shortcuts (`.lnk` files) and packaged apps are supported. On Linux the entries are read from the XDG data directories (`~/.local/share/applications`, `/usr/share/applications`, …).
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-`src/providers/application_provider/` builds a list of `AppResult`s. Desktop apps are launched with `start "" "<path>"`, and UWP apps with `start shell:appsFolder\<app_id>`.
+`src/providers/application_provider/` builds a list of `AppResult`s. On Windows desktop apps are launched with `start "" "<path>"` and UWP apps with `start shell:appsFolder\<app_id>`. On Linux `_linux.py` parses `[Desktop Entry]` sections, strips the `Exec` field codes and launches the resulting argv directly with the current `AppDetail.exec_command`. `_get_app_details._build_full_app_list()` dispatches to the right implementation.
 </details>
 </details>
 
@@ -651,7 +652,7 @@ Just look at the result. While the icon is loading, a spinner is shown, and a de
 <details>
 <summary><b>Developer notes</b></summary>
 
-Icons are extracted with the Windows shell API in `src/helpers/_fetch_icon.py` and rendered by `src/shared_ui_elements/icon.py`.
+On Windows icons are extracted with the Windows shell API in `src/helpers/_fetch_icon_win.py`. On Linux `_linux.py` resolves the freedesktop `Icon=` name to a real file (theme directories, then `/usr/share/pixmaps`) and it is loaded by `src/helpers/_fetch_icon_unix.py`. `src/helpers/_fetch_icon.py` is the platform facade; both feed `src/shared_ui_elements/icon.py`.
 </details>
 </details>
 
@@ -664,10 +665,12 @@ Show recently used files as extra results, so you can reopen them quickly.
 
 This is off by default. Turn on `providers.app_provider.show_recent_files` in the config (or via settings when available). Recent items then appear as `App Name Recent: file`.
 
+Currently Windows only.
+
 <details>
 <summary><b>Developer notes</b></summary>
 
-Recent items are read from Windows Jump Lists (`src/providers/application_provider/_get_recents.py`) and merged into the app results when the setting is enabled.
+Recent items are read from Windows Jump Lists (`src/providers/application_provider/_get_recents.py`) and merged into the app results when the setting is enabled. The feature is gated behind `IS_WINDOWS`, so on Linux it is simply skipped.
 </details>
 </details>
 
@@ -743,7 +746,7 @@ Registered in `src/providers/command_provider/command_provider.py`. Calls `sys.e
 
 ### Shut down _implemented_
 
-Shut down the computer, respecting Windows fast startup / hybrid shutdown.
+Shut down the computer. On Windows this respects fast startup / hybrid shutdown; on Linux it uses `systemd`/`logind`.
 
 <details>
 <summary><b>How to use</b></summary>
@@ -753,7 +756,7 @@ Type `Power: Shutdown` and press Enter.
 <details>
 <summary><b>Developer notes</b></summary>
 
-Uses the hybrid-shutdown helper in the command provider's `_shutdown.py`. An earlier version was slow; that was fixed by improving how the shutdown is issued.
+Uses `shutdown_respect_hybrid` in `src/providers/command_provider/_shutdown.py`. On Windows it reads the `HiberbootEnabled` registry value to decide between a hybrid and a full shutdown (an earlier version was slow; that was fixed by improving how the shutdown is issued). On Linux it runs `systemctl poweroff`, falling back to `loginctl poweroff`.
 </details>
 </details>
 
@@ -769,7 +772,7 @@ Type `Power: Restart` and press Enter.
 <details>
 <summary><b>Developer notes</b></summary>
 
-Runs `shutdown.exe /r /t 0`.
+Runs `shutdown /r /t 0` on Windows and `systemctl reboot` (or `loginctl reboot`) on Linux, via `src/providers/command_provider/_shutdown.py`.
 </details>
 </details>
 
@@ -785,23 +788,23 @@ Type `Power: Hibernate` and press Enter.
 <details>
 <summary><b>Developer notes</b></summary>
 
-Runs `shutdown.exe /h`. A planned improvement is to hide this command when hibernation is disabled in Windows.
+Runs `shutdown /h` on Windows and `systemctl hibernate` on Linux. On Linux the machine must have a configured swap/resume device. A planned improvement is to hide this command when hibernation is disabled in Windows.
 </details>
 </details>
 
-### Sleep _in progress_
+### Sleep _implemented_
 
 Put the computer to sleep.
 
 <details>
 <summary><b>How to use</b></summary>
 
-The command `Power: Sleep` exists in the list but does not do anything yet.
+Type `Power: Sleep` and press Enter.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-Registered with an empty shell command and a TODO in `command_provider.py`. Needs a working sleep call.
+Runs `rundll32 powrprof.dll,SetSuspendState` on Windows and `systemctl suspend` on Linux, via `src/providers/command_provider/_shutdown.py`.
 </details>
 </details>
 
@@ -817,7 +820,7 @@ Type `Power: Lock` and press Enter.
 <details>
 <summary><b>Developer notes</b></summary>
 
-Runs `rundll32.exe user32.dll,LockWorkStation`.
+Runs `rundll32 user32.dll,LockWorkStation` on Windows. On Linux it tries `loginctl lock-session`, then `xdg-screensaver lock`.
 </details>
 </details>
 
@@ -839,7 +842,7 @@ The command uses a custom result widget. The download and install logic is in `s
 
 ### Scheduled startup tasks _implemented_
 
-Add or remove Prospero from Windows startup.
+Add or remove Prospero from startup.
 
 <details>
 <summary><b>How to use</b></summary>
@@ -849,7 +852,7 @@ Type `Add Prospero to Scheduled Tasks` or `Remove Prospero from Scheduled Tasks`
 <details>
 <summary><b>Developer notes</b></summary>
 
-Uses `src/helpers/windows_task_schedule_handler.py`.
+Uses `src/helpers/windows_task_schedule_handler.py` on Windows and `src/helpers/linux_autostart.py` (XDG autostart) on Linux. `src/helpers/__init__.py` selects the one for the platform.
 </details>
 </details>
 
@@ -955,17 +958,17 @@ Needs a Windows window-enumeration helper and a new command source.
 
 ### System / Dark / Light mode _implemented_
 
-Choose how Prospero looks, or follow Windows.
+Choose how Prospero looks, or follow the system.
 
 <details>
 <summary><b>How to use</b></summary>
 
-Set `appearance.theme_mode` to `System`, `Dark`, or `Light` in the config. `System` follows the Windows light/dark setting and switches automatically.
+Set `appearance.theme_mode` to `System`, `Dark`, or `Light` in the config. `System` follows the desktop light/dark setting (on Windows and Linux) and switches automatically.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-Defined in `src/configs/categories/appearance_category.py`. Theme changes are applied by `src/theme/_theme.py`.
+Defined in `src/configs/categories/appearance_category.py`. Theme changes are applied by `src/theme/_theme.py`, which reads the system preference from `QApplication.styleHints().colorScheme()` and listens to `colorSchemeChanged`.
 </details>
 </details>
 
@@ -1060,7 +1063,7 @@ All settings live in one readable file.
 <details>
 <summary><b>How to use</b></summary>
 
-Settings are stored in `%USERPROFILE%\.config\Prospero.toml` and created with defaults on first run. Pass `--config <path>` to use a different file.
+Settings are stored in `%USERPROFILE%\.config\Prospero\Prospero.toml` on Windows and `~/.config/Prospero/Prospero.toml` on Linux, and created with defaults on first run. Pass `--config <path>` to use a different file.
 
 <details>
 <summary><b>Developer notes</b></summary>
@@ -1617,7 +1620,7 @@ Part of the customizable-placeholder work; needs the settings binding and the `u
 
 ### Icon loading _implemented_
 
-Results show real icons loaded from the Windows shell.
+Results show real icons loaded from the platform.
 
 <details>
 <summary><b>How to use</b></summary>
@@ -1627,7 +1630,7 @@ Automatic for app results.
 <details>
 <summary><b>Developer notes</b></summary>
 
-`src/helpers/_fetch_icon.py` reads icons from files and from packaged apps. Different load methods are described by `IconLoadMethod` in `src/data_objects.py`.
+`src/helpers/_fetch_icon.py` is a facade that picks the platform implementation. On Windows (`_fetch_icon_win.py`) icons come from the shell APIs, both from files and from packaged apps. On Linux (`_fetch_icon_unix.py`) the app provider already resolved the freedesktop icon name to a file, so it just loads the image. Different load methods are described by `IconLoadMethod` in `src/data_objects.py`.
 </details>
 </details>
 
@@ -1706,12 +1709,12 @@ Check for new versions on GitHub and install them.
 <details>
 <summary><b>How to use</b></summary>
 
-Use the `Updater` command. The latest release is fetched, downloaded, and the installer is launched quietly.
+Use the `Updater` command. The latest release is fetched, downloaded, and (on Windows) the installer is launched quietly.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-`src/updater.py` fetches the latest release from the GitHub API, downloads the first asset, verifies progress, and runs the installer with `/silent`, `/autostart`, and `/dir=...`.
+`src/updater.py` fetches the latest release from the GitHub API, downloads the first asset, verifies progress, and on Windows runs the installer with `/silent`, `/autostart`, and `/dir=...`. On Linux the download is skipped for installation because there is no Inno Setup equivalent yet — the update check still works, but installing is manual (download the new tarball and re-run `install.sh`).
 </details>
 </details>
 

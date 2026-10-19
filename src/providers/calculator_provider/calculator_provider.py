@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Collection
 from typing import override
 
@@ -10,20 +11,35 @@ from .._base_provider import BaseProvider
 from ..base_result_and_widgets import BaseResult, ExecutionAction
 from .nl_calc.arithmetic_split_method import ArithmeticEvalError, evaluator
 
+logger = logging.getLogger(__name__)
+
 
 class CalcResult(BaseResult):
     @override
     def execute(self, action: ExecutionAction) -> None:
-        if action is ExecutionAction.Trigger:
+        if action is not ExecutionAction.Trigger:
+            return
+
+        try:
+            import pyperclip  # if pyperclip is available, use it.
+        except ImportError:
+            pyperclip = None  # pyright: ignore[reportAssignmentType]
+
+        if pyperclip is not None:
             try:
-                import pyperclip  # if pyperclip is available, use it.
-
                 pyperclip.copy(self.text)
-            except ImportError:
-                # Importing PySide6 here so it will not imported when launching in cli mode
-                from PySide6.QtGui import QGuiApplication
+                return
+            except pyperclip.PyperclipException:
+                # Installed, but no backend (xclip/xsel/wl-copy missing) on this system.
+                logger.debug("pyperclip has no usable clipboard backend; falling back to Qt")
 
-                QGuiApplication.clipboard().setText(self.text)
+        # Importing PySide6 here so it will not be imported when launching in cli mode.
+        from PySide6.QtGui import QGuiApplication
+
+        if QGuiApplication.instance() is None:
+            logger.warning("No clipboard available; result was not copied")
+            return
+        QGuiApplication.clipboard().setText(self.text)
 
 
 class CalcProvider(BaseProvider):

@@ -58,6 +58,22 @@ class TestBugFixes:
             def _dup(m, spec):
                 return "nope"
 
+    def test_token_update_hook_is_removed_when_object_is_destroyed(self, qt_app):
+        "Regression: the destroyed handler used to remove the wrong callable and raise KeyError."
+        import shiboken6
+        from PySide6.QtCore import QObject
+
+        from query_placeholder_tokens import _TOKEN_UPDATE_HOOK
+
+        before = set(_TOKEN_UPDATE_HOOK)
+        parent = QObject()
+        _ = PlaceholderFormatter("x", parent)
+        assert len(_TOKEN_UPDATE_HOOK) == len(before) + 1
+
+        shiboken6.delete(parent)
+
+        assert _TOKEN_UPDATE_HOOK == before
+
 
 # ---------------------------------------------------------------------------
 # unit tokens only resolve inside a meta spec ("enable_units")

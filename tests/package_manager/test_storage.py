@@ -5,6 +5,7 @@ members anything at all.
 """
 
 import stat
+import sys
 import zipfile
 from pathlib import Path
 
@@ -41,14 +42,17 @@ def test_modules_root_honours_env_override(monkeypatch: pytest.MonkeyPatch, tmp_
     assert modules_root() == tmp_path / "somewhere"
 
 
-def test_modules_root_defaults_under_local_appdata(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_modules_root_defaults_per_platform(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PROSPERO_MODULES_PATH", raising=False)
-    monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\tester\AppData\Local")
 
-    root = modules_root()
-
-    assert root.name == "modules"
-    assert root.parent.name == "Prospero"
+    if sys.platform == "win32":
+        monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\tester\AppData\Local")
+        root = modules_root()
+        assert root.name == "modules"
+        assert root.parent.name == "Prospero"
+    else:
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        assert modules_root() == Path.home() / ".local" / "share" / "prospero" / "modules"
 
 
 def test_module_dir_is_name_and_version(tmp_path: Path) -> None:
@@ -258,9 +262,13 @@ def test_default_root_is_under_a_directory_named_after_the_app(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("PROSPERO_MODULES_PATH", raising=False)
-    monkeypatch.setenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
 
-    assert "Prospero" in str(modules_root())
+    if sys.platform == "win32":
+        monkeypatch.setenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
+        assert "Prospero" in str(modules_root())
+    else:
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        assert "prospero" in str(modules_root())
 
 
 # endregion

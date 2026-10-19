@@ -3,10 +3,30 @@ import sys
 from typing import TYPE_CHECKING
 
 import constants  # for update APP_STARTED_TIME  # noqa: F401
+from platform_utils import IS_WINDOWS
 
 if TYPE_CHECKING:
     from providers import BaseResult
     from providers._base_provider import BaseProvider
+
+
+def _read_key() -> str:
+    """Read a single keypress without echoing it, on any platform."""
+    if IS_WINDOWS:
+        import msvcrt
+
+        return msvcrt.getwch()
+
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        return sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 class CLIRenderer:
@@ -28,15 +48,13 @@ class CLIRenderer:
 
 
 def cli() -> None:
-    import msvcrt
     import string
 
-    from providers import PROVIDERS, ExecutionAction
+    from providers import PROVIDERS_I, ExecutionAction
 
-    # Prepare providers
-    providers: list[BaseProvider] = []
-    for provider in PROVIDERS:
-        providers.append(provider())
+    # Reuse the provider instances created on import. Building new ones would register the
+    # placeholder tokens a second time and raise.
+    providers: list[BaseProvider] = list(PROVIDERS_I)
 
     renderer = CLIRenderer()
 
@@ -45,7 +63,7 @@ def cli() -> None:
     query_buffer = ""
     first_res: BaseResult | None = None
     while True:
-        ch = msvcrt.getwch()
+        ch = _read_key()
         match ch:
             case "\x03":
                 break
@@ -78,6 +96,8 @@ def cli() -> None:
 
 
 def ui() -> None:
+    import os
+
     from PySide6.QtGui import QAction, QIcon
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -85,6 +105,15 @@ def ui() -> None:
     from hotkey_listener import HotkeyListener
     from ui import MainWindow
     from updater import Updater
+
+    # Wayland cannot position top-level windows (spawn slide, drag, position config
+    # all silently no-op). Run via XWayland, which KWin fully honors, when available.
+    if (
+        not os.environ.get("QT_QPA_PLATFORM")
+        and os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+        or os.environ.get("WAYLAND_DISPLAY")
+    ) and os.environ.get("DISPLAY"):
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
 
     app = QApplication(sys.argv)
 

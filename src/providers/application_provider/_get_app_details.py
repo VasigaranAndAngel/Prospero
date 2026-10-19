@@ -3,7 +3,7 @@ import json
 import logging
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from configs import conf
 from data_objects import IconLoadMethod, LoadMethod
+from platform_utils import IS_WINDOWS
 
 from ._lnk_parser import LnkDetail, parse_lnk
 
@@ -53,6 +54,8 @@ class AppDetail:
     icon: IconLoadMethod | None = None
     lnk_detail: LnkDetail | None = None
     recent_files: list[Path] | None = None
+    exec_command: Sequence[str] | None = None
+    "Ready-made argv for launching the app (used on platforms without a shell launcher)."
 
 
 def _run_ps(command: str):
@@ -100,6 +103,15 @@ def _get_shortcut_targets() -> list[ShortcutTarget]:
 
 
 def _build_full_app_list() -> list[AppDetail]:
+    "Builds the full app list using the implementation for the current platform."
+    if IS_WINDOWS:
+        return _build_full_app_list_windows()
+    from ._linux import build_app_list
+
+    return build_app_list()
+
+
+def _build_full_app_list_windows() -> list[AppDetail]:
     "Retrieves Start apps, appx packages, and shortcut files. then combines data and returns a list"
     t1 = time.perf_counter()
     start_apps = _get_start_apps()
@@ -172,7 +184,7 @@ class AppDetailsFetcher(Thread):
 
         Calling directly will block this thread. Call start method to fetch from separate thread.
         """
-        recent_on = conf.providers.app_provider.show_recent_files.value
+        recent_on = IS_WINDOWS and conf.providers.app_provider.show_recent_files.value
         self.still_fetching = recent_on
         self._callback(x := _build_full_app_list())  # give app list. finding recent takes a while
         self.still_fetching = False  # this will used when calling next callback

@@ -19,6 +19,16 @@ from query_placeholder_tokens import register_query_placeholder_token as registe
 __all__ = ["register_token", "PlaceholderFormatter"]
 
 
+def _discard_token_update_hook(hook: Callable[[str], None], *_: object) -> None:
+    """Remove a formatter's update hook when its object is destroyed.
+
+    ``QObject.destroyed`` passes the (already half-deleted) object, so the extra positional
+    argument is accepted and ignored. ``discard`` is used instead of ``remove`` so a missing
+    entry never raises while the interpreter is tearing down.
+    """
+    _TOKEN_UPDATE_HOOK.discard(hook)
+
+
 @dataclass
 class _Metrics:
     v: Version = VERSION
@@ -221,8 +231,13 @@ class PlaceholderFormatter(QObject):
 
         self.set_formatter(fmt)
         _ = self._token_update_signal.connect(self._token_update)
-        _TOKEN_UPDATE_HOOK.add(self._token_update_signal.emit)
-        _ = self.destroyed.connect(partial(_TOKEN_UPDATE_HOOK.remove, self._token_update))
+        # Add the *exact* callable the destroyed handler removes. The old code added
+        # ``self._token_update_signal.emit`` but removed ``self._token_update`` (a different
+        # bound method), which raised a KeyError once the C++ object was gone and left a
+        # dangling hook behind.
+        hook = self._token_update_signal.emit
+        _TOKEN_UPDATE_HOOK.add(hook)
+        _ = self.destroyed.connect(partial(_discard_token_update_hook, hook))
 
     def _token_update(self, token: str) -> None:
         if PlaceholderFormatter._token_in_use(token):

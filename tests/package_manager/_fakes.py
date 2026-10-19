@@ -10,11 +10,23 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
+from packaging.tags import sys_tags
 
 from package_manager._allowlist import PILLOW, AllowedWheel
 
-WHEEL_NAME: str = "pillow-12.3.0-cp312-cp312-win_amd64.whl"
-"Filename the allowlist expects, so its tags and dist-info name line up."
+
+def _current_platform_tag() -> str:
+    """The most specific platform tag the running interpreter accepts.
+
+    Used so the synthetic wheel below looks installable on whichever host runs the tests.
+    """
+    return next(iter(sys_tags())).platform
+
+
+PLATFORM_TAG: str = _current_platform_tag()
+
+WHEEL_NAME: str = f"pillow-12.3.0-cp312-cp312-{PLATFORM_TAG}.whl"
+"Filename tagged for the host platform, so its tags and dist-info name line up."
 
 MEMBERS: Mapping[str, bytes] = {
     "PIL/__init__.py": b'__version__ = "12.3.0"\n',
@@ -102,5 +114,8 @@ def patch_wheel(
         url=wheel.as_uri() if url is None else url,
         requires_python=requires_python,
     )
-    monkeypatch.setitem(PILLOW.wheels, "win_amd64", patched)
+    # Replace every pinned entry, so whichever one select_wheel would pick on this host is the
+    # synthetic wheel instead of a real build whose digest would not match.
+    for key in list(PILLOW.wheels):
+        monkeypatch.setitem(PILLOW.wheels, key, patched)
     return patched
