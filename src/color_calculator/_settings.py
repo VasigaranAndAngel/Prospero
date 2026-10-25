@@ -19,12 +19,13 @@ from tomli_w import dumps as toml_dumps
 
 from config_models import BaseCategory, ChangeEvent, ConfigValue, Observable
 from constants import APPLICATION_NAME
+from platform_specific.paths import config_dir
 
 from ._named_colors import DEFAULT_NAMED_COLORS_FILE
 
 logger = logging.getLogger(__name__)
 
-COLOR_SETTINGS_FILE: Path = Path.home() / ".config" / APPLICATION_NAME.title() / "color.toml"
+COLOR_SETTINGS_FILE: Path = config_dir() / "color.toml"
 "Where the color backend's settings live."
 
 

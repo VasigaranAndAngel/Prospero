@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Literal, overload, override
 
+from platform_specific import CREATE_NO_WINDOW
+
 from constants import APPLICATION_NAME, VERSION
 from fuzzy_finder import BaseChoice, IncrementalMatcher
-from helpers import task_schedule_handler
-from platform_utils import CREATE_NO_WINDOW
+from platform_specific import startup
 
 from .._base_provider import BaseProvider
 from ..base_result_and_widgets import (
@@ -18,7 +19,7 @@ from ..base_result_and_widgets import (
     ExecutionAction,
     ResultAttributes,
 )
-from ._shutdown import hibernate, lock, restart, shutdown, sleep
+from ._power import hibernate, lock, restart, shutdown, sleep
 from ._updater_result_widget import UpdaterResultWidget
 
 logger = logging.getLogger(__name__)
@@ -101,12 +102,12 @@ _COMMANDS: dict[str, Command] = {
     "Updater": Command(None, None, f"Update {APPLICATION_NAME.title()}", UpdaterResultWidget),
     f"Add {APPLICATION_NAME.title()} to Scheduled Tasks": Command(
         "func",
-        partial(task_schedule_handler.add_task, lambda x: None),
+        partial(startup.add_task, lambda x: None),
         f"Adds {APPLICATION_NAME.title()} to scheduled tasks to start on current user log on.",
     ),
     f"Remove {APPLICATION_NAME.title()} from Scheduled Tasks": Command(
         "func",
-        partial(task_schedule_handler.remove_task, lambda x: None),
+        partial(startup.remove_task, lambda x: None),
         f"Removes {APPLICATION_NAME.title()} from scheduled tasks.",
     ),
     "Version": Command(None, None, f"Current version of {APPLICATION_NAME.title()} is {VERSION}"),

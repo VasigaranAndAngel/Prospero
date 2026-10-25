@@ -20,9 +20,9 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 import assets
-import helpers
 from data_objects import IconLoadMethod, LoadMethod
 from global_threading import THREAD_POOL
+from platform_specific.icons import load_icon
 
 
 class _DefaultSvgRenderer(QSvgRenderer):
@@ -194,20 +194,7 @@ class Icon(QLabel):
     def _load_icon(self, attempt: int = 1) -> None:
         ic = None
         try:
-            lm, path = self._i_load_method.load_method, self._i_load_method.file_path
-            if (
-                lm is LoadMethod.win32api_windows_app
-                and (x := self._i_load_method.app_id) is not None
-            ):
-                ic = helpers.fetch_windows_app_icon(x)
-            elif path is None or lm in {LoadMethod.default, LoadMethod.loading}:
-                pass  # let ic to be None
-            elif lm is LoadMethod.win32api:
-                ic = helpers.fetch_icon(path)
-            elif lm is LoadMethod.win32api_generic:
-                ic = helpers.fetch_icon(path, use_generic_type=True)
-            elif lm is LoadMethod.load_file:
-                ic = QImage(path)
+            ic = load_icon(self._i_load_method)
         except Exception as e:
             print(f"failed fetching (attempt: {attempt}): {e}")
 
@@ -217,6 +204,8 @@ class Icon(QLabel):
                 return
 
             ic = None
+        if ic is not None:
+            ic = ic.scaledToWidth(self.width(), mode=Qt.TransformationMode.SmoothTransformation)
         self._icon_cache[self._i_load_method] = ic, time.time()
         self._image_loaded.emit(ic)
 

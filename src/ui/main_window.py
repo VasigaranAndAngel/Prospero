@@ -1,4 +1,3 @@
-import ctypes
 import logging
 from collections.abc import Collection
 from typing import Literal, cast, override
@@ -19,7 +18,7 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from config_models import ChangeEvent
 from configs import conf
-from platform_utils import IS_WINDOWS
+from platform_specific.windowing import force_foreground
 from providers import BaseResult, BaseResultBoxWidget, LoadingRequest, ResultBox, search_async
 from query_placeholder_tokens import register_query_placeholder_token, token_update
 from shared_ui_elements import AnimatedVBoxLayout
@@ -432,26 +431,6 @@ class MainWindow(QWidget):
         y = self._pos.y()
         self.setGeometry(x, y, width, height)
 
-    def _force_foreground(self, hwnd: int):
-        if not IS_WINDOWS:
-            # X11/Wayland rely on the window manager; activateWindow() is the portable path.
-            return
-        user32 = ctypes.windll.user32
-        fg_hwnd = user32.GetForegroundWindow()  # pyright: ignore[reportAny]
-        if not fg_hwnd:
-            user32.SetForegroundWindow(hwnd)
-            return
-        fg_thread = user32.GetWindowThreadProcessId(fg_hwnd, None)  # pyright: ignore[reportAny]
-        current_thread = ctypes.windll.kernel32.GetCurrentThreadId()  # pyright: ignore[reportAny]
-        if fg_thread == current_thread:
-            user32.SetForegroundWindow(hwnd)
-            return
-        user32.AttachThreadInput(fg_thread, current_thread, True)
-        try:
-            user32.SetForegroundWindow(hwnd)
-        finally:
-            user32.AttachThreadInput(fg_thread, current_thread, False)
-
     def _update_size(self) -> None:
         "Updates the size of window according to configs and spawn state with animation"
         src_s = self.screen().size()
@@ -478,7 +457,7 @@ class MainWindow(QWidget):
     def show(self, /) -> None:
         self._close = False
         super().show()
-        self._force_foreground(self.winId())
+        force_foreground(self.winId())
         self.raise_()
         QTimer.singleShot(1, self.activateWindow)
         self._query_box.setFocus()

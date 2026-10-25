@@ -17,9 +17,12 @@ from pathlib import Path
 
 from data_objects import IconLoadMethod, LoadMethod
 
-from ._get_app_details import AppDetail
+from .._types import AppDetail, Launch
 
 logger = logging.getLogger(__name__)
+
+supports_recent_files: bool = False
+"Recent-document integration is not implemented for freedesktop systems."
 
 _APPLICATIONS = "applications"
 _ICON_EXTENSIONS = (".png", ".svg", ".xpm")
@@ -103,7 +106,7 @@ _ICON_CACHE: dict[str, Path | None] = {}
 
 
 def _icon_base_dirs() -> list[Path]:
-    dirs: list[Path] = [_data_home() / "icons"]
+    dirs: list[Path] = [_data_home() / "icons", _data_home() / "pixmaps"]
     dirs += [d / "icons" for d in _data_dirs()]
     dirs += [d / "pixmaps" for d in _data_dirs()]
     return [d for d in dirs if d.is_dir()]
@@ -187,7 +190,7 @@ def build_app_list() -> list[AppDetail]:
                 type="desktop",
                 path=path,
                 icon=icon,
-                exec_command=exec_command,
+                launch=Launch(exec_command),
             )
         )
 
@@ -195,4 +198,9 @@ def build_app_list() -> list[AppDetail]:
     return details
 
 
-__all__ = ["build_app_list", "find_icon_file"]
+def get_recent_files(details: list[AppDetail]) -> list[AppDetail]:
+    """No-op: freedesktop has no jump-list equivalent implemented here."""
+    return details
+
+
+__all__ = ["build_app_list", "find_icon_file", "get_recent_files", "supports_recent_files"]

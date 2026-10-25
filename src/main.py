@@ -3,30 +3,13 @@ import sys
 from typing import TYPE_CHECKING
 
 import constants  # for update APP_STARTED_TIME  # noqa: F401
-from platform_utils import IS_WINDOWS
+from platform_specific import require_supported
+from platform_specific.cli import read_key
+from platform_specific.display import configure_qt_platform
 
 if TYPE_CHECKING:
     from providers import BaseResult
     from providers._base_provider import BaseProvider
-
-
-def _read_key() -> str:
-    """Read a single keypress without echoing it, on any platform."""
-    if IS_WINDOWS:
-        import msvcrt
-
-        return msvcrt.getwch()
-
-    import termios
-    import tty
-
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        return sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 class CLIRenderer:
@@ -63,7 +46,7 @@ def cli() -> None:
     query_buffer = ""
     first_res: BaseResult | None = None
     while True:
-        ch = _read_key()
+        ch = read_key()
         match ch:
             case "\x03":
                 break
@@ -96,24 +79,15 @@ def cli() -> None:
 
 
 def ui() -> None:
-    import os
-
     from PySide6.QtGui import QAction, QIcon
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
     import assets
-    from hotkey_listener import HotkeyListener
+    from platform_specific.hotkeys import HotkeyListener
     from ui import MainWindow
     from updater import Updater
 
-    # Wayland cannot position top-level windows (spawn slide, drag, position config
-    # all silently no-op). Run via XWayland, which KWin fully honors, when available.
-    if (
-        not os.environ.get("QT_QPA_PLATFORM")
-        and os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
-        or os.environ.get("WAYLAND_DISPLAY")
-    ) and os.environ.get("DISPLAY"):
-        os.environ["QT_QPA_PLATFORM"] = "xcb"
+    configure_qt_platform()
 
     app = QApplication(sys.argv)
 
@@ -147,6 +121,8 @@ def ui() -> None:
 
 
 def main() -> None:
+    require_supported()
+
     import logging
 
     from arg_parser import args
@@ -163,10 +139,10 @@ def main() -> None:
         logger = logging.getLogger(__name__)
 
         try:
-            from helpers import task_schedule_handler
+            from platform_specific.startup import start_listener
 
             logger.debug("Starting listener...")
-            _ = task_schedule_handler.start_listener(schtasks_handler[0], schtasks_handler[1])
+            _ = start_listener(schtasks_handler[0], schtasks_handler[1])
         except Exception as e:
             logger.error(f"Error running TaskScheduleHandler: {e}")
 

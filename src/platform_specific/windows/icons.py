@@ -6,6 +6,8 @@ import win32gui
 import win32ui
 from PySide6.QtGui import QImage
 
+from data_objects import IconLoadMethod, LoadMethod
+
 _SHGFI_ICON = 0x000000100
 _SHGFI_LARGEICON = 0x000000000
 _SHGFI_SMALLICON = 0x000000001
@@ -78,7 +80,7 @@ def _try_get_icon(filepath: str, size: int, use_generic_type: bool) -> QImage | 
         return None
 
 
-def fetch_icon(filepath: Path, size: int = 32, use_generic_type: bool = False) -> QImage | None:
+def _fetch_icon(filepath: Path, size: int = 32, use_generic_type: bool = False) -> QImage | None:
     """Fetch icon with win32 api of a file and return it as QImage, or None on failure.
 
     Falls back to the generic type icon when the real file icon cannot be
@@ -131,3 +133,24 @@ def fetch_windows_app_icon(app_user_model_id: str, size: int = 32) -> QImage:
         return _hicon_to_qimage(info.hIcon, size)
     finally:
         _shell32.ILFree(pidl)
+
+
+def load_icon(icon_load_method: IconLoadMethod, size: int = 32) -> QImage | None:
+    """Resolve any :class:`IconLoadMethod` using the Windows shell APIs."""
+    method, path = icon_load_method.load_method, icon_load_method.file_path
+
+    if method is LoadMethod.win32api_windows_app:
+        app_id = icon_load_method.app_id
+        return fetch_windows_app_icon(app_id, size) if app_id is not None else None
+
+    if method in {LoadMethod.default, LoadMethod.loading} or path is None:
+        return None
+
+    if method is LoadMethod.load_file:
+        image = QImage(str(path))
+        return None if image.isNull() else image
+
+    return _fetch_icon(path, size=size, use_generic_type=method is LoadMethod.win32api_generic)
+
+
+__all__ = ["fetch_windows_app_icon", "load_icon"]

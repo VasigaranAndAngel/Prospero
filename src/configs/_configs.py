@@ -1,5 +1,4 @@
 from collections.abc import Callable, Generator
-from pathlib import Path
 from typing import Annotated, Any, ClassVar, cast, override
 
 import tomli_w
@@ -14,6 +13,7 @@ from pydantic_settings import (
 from config_models import ChangeEvent, Observable
 from config_models._config_value import takes_event
 from constants import APPLICATION_NAME
+from platform_specific.paths import config_dir
 
 from ._ui_info import Category, UIInfo
 from .categories import (
@@ -23,9 +23,7 @@ from .categories import (
     WindowGeometryCategory,
 )
 
-CONFIG_FILE_PATH = (
-    Path.home() / ".config" / APPLICATION_NAME.title() / (APPLICATION_NAME.title() + ".toml")
-)
+CONFIG_FILE_PATH = config_dir() / (APPLICATION_NAME.title() + ".toml")
 
 
 class Configs(BaseSettings):

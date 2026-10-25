@@ -652,7 +652,7 @@ Just look at the result. While the icon is loading, a spinner is shown, and a de
 <details>
 <summary><b>Developer notes</b></summary>
 
-On Windows icons are extracted with the Windows shell API in `src/helpers/_fetch_icon_win.py`. On Linux `_linux.py` resolves the freedesktop `Icon=` name to a real file (theme directories, then `/usr/share/pixmaps`) and it is loaded by `src/helpers/_fetch_icon_unix.py`. `src/helpers/_fetch_icon.py` is the platform facade; both feed `src/shared_ui_elements/icon.py`.
+On Windows icons are extracted with the Windows shell API in `src/platform_specific/windows/icons.py`. On Linux `_linux.py` resolves the freedesktop `Icon=` name to a real file (theme directories, then `/usr/share/pixmaps`) and it is loaded by `src/platform_specific/linux/icons.py`. `src/platform_specific/icons.py` is the platform facade; both feed `src/shared_ui_elements/icon.py`.
 </details>
 </details>
 
@@ -670,7 +670,7 @@ Currently Windows only.
 <details>
 <summary><b>Developer notes</b></summary>
 
-Recent items are read from Windows Jump Lists (`src/providers/application_provider/_get_recents.py`) and merged into the app results when the setting is enabled. The feature is gated behind `IS_WINDOWS`, so on Linux it is simply skipped.
+Recent items are read from Windows Jump Lists (`src/providers/application_provider/windows/_recents.py`) and merged into the app results when the setting is enabled. The feature is gated behind `IS_WINDOWS`, so on Linux it is simply skipped.
 </details>
 </details>
 

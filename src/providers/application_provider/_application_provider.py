@@ -1,3 +1,7 @@
+"""App provider for the application launcher."""
+
+from __future__ import annotations
+
 import logging
 import subprocess
 from collections.abc import Callable, Collection, Sequence
@@ -25,7 +29,6 @@ class AppResult(BaseResult, BaseChoice):
 
     @override
     def execute(self, action: ExecutionAction) -> None:
-        # os.startfile(self.start)
         if action is ExecutionAction.Trigger:
             logger.debug(f"Launching: {self.command}")
             is_shell = isinstance(self.command, str)
@@ -62,9 +65,17 @@ class AppProvider(BaseProvider):
 
         choices: list[AppResult] = []
         for d in details:
-            if d.exec_command is not None:
+            if getattr(d, "launch", None) is not None:
+                launch = d.launch
                 path_or_app_id = d.path
-                command: str | Sequence[str] = d.exec_command
+                if launch.shell and isinstance(launch.args, str):
+                    command: str | Sequence[str] = launch.args
+                elif isinstance(launch.args, (list, tuple)):
+                    command = list(launch.args)
+                elif isinstance(launch.args, str):
+                    command = launch.args
+                else:
+                    continue
             elif d.type == "uwp":
                 path_or_app_id = d.app_id
                 command = f"start shell:appsFolder\\{path_or_app_id or ''}"
@@ -82,13 +93,20 @@ class AppProvider(BaseProvider):
             )
             choices.append(res)
 
-            if d.recent_files is not None:
-                for r in d.recent_files:
+            rlist = d.recent_files
+            if rlist:
+                for r in rlist:
+                    try:
+                        cmd = r.launch.args if getattr(r.launch, "args", None) is not None else str(r)
+                        if isinstance(cmd, list):
+                            cmd = " ".join(cmd)
+                    except Exception:
+                        cmd = f'start "" "{getattr(r, "path", "")}"'
                     res = AppResult(
-                        text=(d.app_name or "") + " Recent: " + r.name,
-                        command=f'start "" {r}',
-                        description=str(r),
-                        icon_load_method=IconLoadMethod(LoadMethod.win32api, r),
+                        text=(d.app_name or "") + " Recent: " + getattr(r, "name", ""),
+                        command=cmd,
+                        description=str(getattr(r, "path", r)),
+                        icon_load_method=IconLoadMethod(LoadMethod.win32api, getattr(r, "path", None)),
                         attributes=ResultAttributes(suggestion_request=d.app_name or ""),
                     )
                     choices.append(res)
@@ -105,17 +123,12 @@ class AppProvider(BaseProvider):
     def search_async(
         self, query: str, callback: Callable[[Collection[BaseResult] | LoadingRequest], None]
     ) -> None:
-        # NOTE: This method will be called on each query update. self._call_after_fetching will
-        # contain the partial which has the latest query.
         if self._fetching_app_details:
             if not self._loading_request_sent:
-                # Send the loading request instance to the UI. (only if not sent already)
                 callback(self._loading_request)
                 self._loading_request_sent = True
 
-            # Using a wrapper that will be called as soon as search is completed to remove loading request
             def _wrapper(arg: Collection[BaseResult] | LoadingRequest) -> None:
-                "To remove LoadingRequest before giving results."
                 if not self._fetching_app_details:
                     self._loading_request.remove()
                     self._loading_request_sent = False

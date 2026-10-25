@@ -18,12 +18,11 @@ from coloraide.css import color_names as _color_names
 from coloraide.css.parse import tokenize_css
 
 from constants import APPLICATION_NAME
+from platform_specific.paths import config_dir
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_NAMED_COLORS_FILE: Final[Path] = (
-    Path.home() / ".config" / APPLICATION_NAME.title() / "color" / "named_colors.toml"
-)
+DEFAULT_NAMED_COLORS_FILE: Final[Path] = config_dir() / "color" / "named_colors.toml"
 "Where the named color table lives unless a config says otherwise."
 
 RESERVED_NAMES: Final[frozenset[str]] = frozenset(

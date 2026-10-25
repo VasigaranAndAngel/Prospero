@@ -1,7 +1,7 @@
 """Linux autostart via the XDG Autostart specification.
 
 Windows launches at logon through the Task Scheduler
-(:mod:`windows_task_schedule_handler`); Linux desktops read
+(:mod:`platform_specific.windows.startup`); Linux desktops read
 ``$XDG_CONFIG_HOME/autostart/*.desktop`` when the session starts. This module mirrors the
 Windows handler's public API (``add_task``/``remove_task``/``query_task``) so callers such
 as the command provider can stay platform agnostic. Unlike the Windows version, these
@@ -31,8 +31,8 @@ def _exec_command() -> list[str]:
     """Command a desktop session should run to start Prospero."""
     if getattr(sys, "frozen", False):
         return [str(APPLICATION_PATH)]
-    # src/helpers/linux_autostart.py -> project root is parents[2]
-    entry = Path(__file__).resolve().parents[2] / "src" / "main.py"
+    # src/platform_specific/linux/startup.py -> parents[2] is the src directory
+    entry = Path(__file__).resolve().parents[2] / "main.py"
     return [sys.executable, str(entry)]
 
 
