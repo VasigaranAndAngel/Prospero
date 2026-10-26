@@ -167,8 +167,10 @@ class Icon(QLabel):
     TODO: check and remove old icons.
     """
 
-    def __init__(self, icon_load_method: IconLoadMethod, parent: QWidget | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self, icon_load_method: IconLoadMethod, size: int, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
 
         Icon._instances += 1
         self._instance_no: int = Icon._instances
@@ -187,6 +189,7 @@ class Icon(QLabel):
         self._loading_timer.setInterval(1000 // self._loading_fps)
         _ = self._loading_timer.timeout.connect(self._next_frame)
 
+        self.setFixedSize(size, size)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.update_load_method(self._i_load_method)
@@ -194,7 +197,7 @@ class Icon(QLabel):
     def _load_icon(self, attempt: int = 1) -> None:
         ic = None
         try:
-            ic = load_icon(self._i_load_method)
+            ic = load_icon(self._i_load_method, self.width())
         except Exception as e:
             print(f"failed fetching (attempt: {attempt}): {e}")
 

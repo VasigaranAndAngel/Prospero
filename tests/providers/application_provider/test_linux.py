@@ -1,24 +1,6 @@
 """Tests for the Linux desktop entry discovery backend."""
 
-
-from providers.application_provider.linux.apps import build_app_list, find_icon_file
-
-
-def test_find_icon_file_resolves_theme_and_pixmaps(tmp_path, monkeypatch):
-    # theme dir
-    hicolor = tmp_path / "icons" / "hicolor" / "64x64" / "apps"
-    hicolor.mkdir(parents=True)
-    (hicolor / "foo.png").write_bytes(b"PNG")
-    # pixmap
-    pix = tmp_path / "pixmaps"
-    pix.mkdir(parents=True)
-    (pix / "bar.svg").write_text("<svg></svg>")
-
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    monkeypatch.setenv("XDG_DATA_DIRS", str(tmp_path / "other"))
-
-    assert find_icon_file("foo") == hicolor / "foo.png"
-    assert find_icon_file("bar") == pix / "bar.svg"
+from providers.application_provider.linux.apps import build_app_list
 
 
 def test_build_app_list_parses_exec_and_launch(tmp_path, monkeypatch):

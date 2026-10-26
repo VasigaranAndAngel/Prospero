@@ -24,6 +24,8 @@ class LoadMethod(Enum):
     "Retrieves the icon for a Windows application by its App User Model ID"
     load_file = auto()
     "Loads the icon from icon/image file path."
+    linux_find = auto()
+    "Finds the icon in linux enviroment."
     default = auto()
     "Shows the default icon. (Doesn't look for any icons)"
     loading = auto()
@@ -41,27 +43,35 @@ class IconLoadMethod:
     load_method: LoadMethod = LoadMethod.default
     file_path: Path | None = None
     app_id: str | None = None
+    linux_find: str | None = None
 
     def __new__(
-        cls, load_method: LoadMethod, file_path: Path | None = None, app_id: str | None = None
+        cls,
+        load_method: LoadMethod,
+        file_path: Path | None = None,
+        app_id: str | None = None,
+        linux_find: str | None = None,
     ):
         if load_method in {LoadMethod.default, LoadMethod.loading}:
             # No need to store them if load method is default or loading.
             file_path = None
             app_id = None
 
-        hsh = cls._get_hash(load_method, file_path, app_id)
+        hsh = cls._get_hash(load_method, file_path, app_id, linux_find)
         if hsh not in cls._cache:
             ins = cls._cache[hsh] = super().__new__(cls)
             ins.load_method = load_method
             ins.file_path = file_path
             ins.app_id = app_id
+            ins.linux_find = linux_find
         return cls._cache[hsh]
 
     @override
     def __hash__(self) -> int:
-        return self._get_hash(self.load_method, self.file_path, self.app_id)
+        return self._get_hash(self.load_method, self.file_path, self.app_id, self.linux_find)
 
     @staticmethod
-    def _get_hash(load_method: LoadMethod, file_path: Path | None, app_id: str | None) -> int:
-        return hash(f"{load_method}{file_path}{app_id}")
+    def _get_hash(
+        load_method: LoadMethod, file_path: Path | None, app_id: str | None, linux_find: str | None
+    ) -> int:
+        return hash(f"{load_method}{file_path}{app_id}{linux_find}")

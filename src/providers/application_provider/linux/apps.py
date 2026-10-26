@@ -8,7 +8,6 @@ objects. This is the Linux counterpart of the Windows Start Menu / UWP scan.
 from __future__ import annotations
 
 import configparser
-import glob as globmod
 import logging
 import os
 import re
@@ -100,58 +99,6 @@ def _clean_exec(exec_line: str) -> list[str]:
     return cleaned
 
 
-# region icon lookup
-
-_ICON_CACHE: dict[str, Path | None] = {}
-
-
-def _icon_base_dirs() -> list[Path]:
-    dirs: list[Path] = [_data_home() / "icons", _data_home() / "pixmaps"]
-    dirs += [d / "icons" for d in _data_dirs()]
-    dirs += [d / "pixmaps" for d in _data_dirs()]
-    return [d for d in dirs if d.is_dir()]
-
-
-def _candidate_names(name: str) -> list[str]:
-    if Path(name).suffix:
-        return [name]
-    return [f"{name}{ext}" for ext in _ICON_EXTENSIONS]
-
-
-def _find_icon_file(name: str) -> Path | None:
-    direct = Path(name).expanduser()
-    if direct.is_absolute() and direct.is_file():
-        return direct
-
-    for cand in _candidate_names(name):
-        escaped = globmod.escape(cand)
-        for base in _icon_base_dirs():
-            if base.name == "pixmaps":
-                hit = base / cand
-                if hit.is_file():
-                    return hit
-                continue
-            # <icons>/<theme>/<size>/apps/<name> and <icons>/<theme>/apps/<name>
-            for pattern in (f"*/*/apps/{escaped}", f"*/apps/{escaped}", f"*/*/*/apps/{escaped}"):
-                for hit in base.glob(pattern):
-                    if hit.is_file():
-                        return hit
-    return None
-
-
-def find_icon_file(name: str) -> Path | None:
-    """Resolve a freedesktop icon name (or path) to a file, caching the result."""
-    name = name.strip()
-    if not name:
-        return None
-    if name not in _ICON_CACHE:
-        _ICON_CACHE[name] = _find_icon_file(name)
-    return _ICON_CACHE[name]
-
-
-# endregion
-
-
 def build_app_list() -> list[AppDetail]:
     """Build app details from XDG ``.desktop`` entries."""
     details: list[AppDetail] = []
@@ -177,12 +124,7 @@ def build_app_list() -> list[AppDetail]:
 
         name = _get(entry, "Name") or path.stem
         icon_name = _get(entry, "Icon")
-        icon_path = find_icon_file(icon_name) if icon_name else None
-        icon = (
-            IconLoadMethod(LoadMethod.load_file, icon_path)
-            if icon_path is not None
-            else IconLoadMethod(LoadMethod.default)
-        )
+        icon = IconLoadMethod(LoadMethod.linux_find, linux_find=icon_name)
 
         details.append(
             AppDetail(
@@ -203,4 +145,4 @@ def get_recent_files(details: list[AppDetail]) -> list[AppDetail]:
     return details
 
 
-__all__ = ["build_app_list", "find_icon_file", "get_recent_files", "supports_recent_files"]
+__all__ = ["build_app_list", "get_recent_files", "supports_recent_files"]
