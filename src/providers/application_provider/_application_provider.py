@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import subprocess
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 from typing import override
 
 from data_objects import IconLoadMethod, LoadMethod
@@ -17,31 +15,26 @@ from .._base_provider import BaseProvider
 from .._loading_request import LoadingRequest
 from ..base_result_and_widgets import BaseResult, ExecutionAction, ResultAttributes
 from ._get_app_details import AppDetail, AppDetailsFetcher
+from ._types import Launch
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
 class AppResult(BaseResult, BaseChoice):
-    command: str | Sequence[str] = ""
-    "Command that will be sent to the subprocess.Popen."
+    launch: Launch
+    "Launch to be called to execute."
     description: str | None = None
 
     @override
     def execute(self, action: ExecutionAction) -> None:
         if action is ExecutionAction.Trigger:
-            logger.debug(f"Launching: {self.command}")
-            is_shell = isinstance(self.command, str)
-            _ = subprocess.Popen(
-                self.command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=is_shell,
-            )
+            logger.debug(f"Launching: {self.launch}")
+            self.launch()
 
     @override
     def __hash__(self) -> int:
-        return hash(self.text + str(self.command))
+        return hash(self.text + str(self.launch.args))
 
 
 class AppProvider(BaseProvider):
@@ -65,29 +58,29 @@ class AppProvider(BaseProvider):
 
         choices: list[AppResult] = []
         for d in details:
-            if getattr(d, "launch", None) is not None:
-                launch = d.launch
-                path_or_app_id = d.path
-                if launch.shell and isinstance(launch.args, str):
-                    command: str | Sequence[str] = launch.args
-                elif isinstance(launch.args, (list, tuple)):
-                    command = list(launch.args)
-                elif isinstance(launch.args, str):
-                    command = launch.args
-                else:
-                    continue
-            elif d.type == "uwp":
-                path_or_app_id = d.app_id
-                command = f"start shell:appsFolder\\{path_or_app_id or ''}"
-            elif d.type == "desktop":
-                path_or_app_id = d.path
-                command = f'start "" "{path_or_app_id or Path()}"'
-            else:
-                continue
+            # if getattr(d, "launch", None) is not None:
+            #     launch = d.launch
+            #     path_or_app_id = d.path
+            #     if launch.shell and isinstance(launch.args, str):
+            #         command: str | Sequence[str] = launch.args
+            #     elif isinstance(launch.args, (list, tuple)):
+            #         command = list(launch.args)
+            #     elif isinstance(launch.args, str):
+            #         command = launch.args
+            #     else:
+            #         continue
+            # elif d.type == "uwp":
+            #     path_or_app_id = d.app_id
+            #     command = f"start shell:appsFolder\\{path_or_app_id or ''}"
+            # elif d.type == "desktop":
+            #     path_or_app_id = d.path
+            #     command = f'start "" "{path_or_app_id or Path()}"'
+            # else:
+            #     continue
             res = AppResult(
                 text=d.app_name or "",
-                command=command,
-                description=str(path_or_app_id),
+                launch=d.launch,
+                description=str(d.app_id if d.type == "uwp" else d.path),
                 icon_load_method=d.icon or IconLoadMethod(LoadMethod.default),
                 attributes=ResultAttributes(suggestion_request=d.app_name or ""),
             )
@@ -96,17 +89,13 @@ class AppProvider(BaseProvider):
             rlist = d.recent_files
             if rlist:
                 for r in rlist:
-                    try:
-                        cmd = r.launch.args if getattr(r.launch, "args", None) is not None else str(r)
-                        if isinstance(cmd, list):
-                            cmd = " ".join(cmd)
-                    except Exception:
-                        cmd = f'start "" "{getattr(r, "path", "")}"'
                     res = AppResult(
                         text=(d.app_name or "") + " Recent: " + getattr(r, "name", ""),
-                        command=cmd,
+                        launch=r.launch,
                         description=str(getattr(r, "path", r)),
-                        icon_load_method=IconLoadMethod(LoadMethod.win32api, getattr(r, "path", None)),
+                        icon_load_method=IconLoadMethod(
+                            LoadMethod.win32api, getattr(r, "path", None)
+                        ),
                         attributes=ResultAttributes(suggestion_request=d.app_name or ""),
                     )
                     choices.append(res)

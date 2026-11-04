@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,14 +13,32 @@ from data_objects import IconLoadMethod
 
 @dataclass(frozen=True)
 class Launch:
-    """How to start a discovered application or document.
+    """Execute application or document.
 
+    Call this to execute the application or document.
     ``args`` is either a ready argv sequence (POSIX) or a shell command string (Windows),
     and ``shell`` says which of the two ``subprocess`` should be given.
     """
 
     args: str | Sequence[str]
     shell: bool = False
+
+    def __call__(self) -> None:
+        if self.shell and isinstance(self.args, str):
+            cmd = self.args
+        elif isinstance(self.args, (list, tuple)):
+            cmd = list(self.args)
+        elif isinstance(self.args, str):
+            cmd = self.args
+        else:
+            return
+
+        _ = subprocess.Popen(
+            args=cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=isinstance(cmd, str),
+        )
 
 
 @dataclass(frozen=True)

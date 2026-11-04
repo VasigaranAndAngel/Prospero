@@ -116,11 +116,13 @@ def build_app_list() -> list[AppDetail]:
             continue
         if _get(entry, "Terminal").lower() in {"true", "1"}:
             # Launching a terminal app without a terminal would just fail silently.
+            # TODO: Run default or specified in config shell to execute it.
             continue
 
-        exec_command = _clean_exec(_get(entry, "Exec"))
-        if not exec_command:
+        argv = _clean_exec(_get(entry, "Exec"))
+        if not argv:
             continue
+        launch = Launch(["setsid", "-f", "systemd-run", "--user", "--scope", "--", *argv])
 
         name = _get(entry, "Name") or path.stem
         icon_name = _get(entry, "Icon")
@@ -132,7 +134,7 @@ def build_app_list() -> list[AppDetail]:
                 type="desktop",
                 path=path,
                 icon=icon,
-                launch=Launch(exec_command),
+                launch=launch,
             )
         )
 
