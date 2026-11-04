@@ -19,10 +19,13 @@ except ImportError:  # pragma: no cover
     propsys = None
     pscon = None
 
-from ._lnk_parser import _BoundedReader, _patch_pylnk3
+from data_objects import IconLoadMethod, LoadMethod
+
+from .._types import Launch, RecentFile
+from ._lnk_parser import LnkDetail, _BoundedReader, _patch_pylnk3
 
 if TYPE_CHECKING:
-    from ._get_app_details import AppDetail
+    from .._types import AppDetail
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +114,7 @@ def normalize_variants(exe: str) -> list[str]:
     def sub(prefix, repl, head=""):
         anchor = prefix + ("\\" + head if head else "")
         if low.startswith(anchor.lower() + "\\") or low == anchor.lower():
-            variants.append(repl + exe[len(anchor):])
+            variants.append(repl + exe[len(anchor) :])
 
     sub(win + "\\system32", FOLDER_GUIDS["system"])
     sub(win + "\\SysWOW64", FOLDER_GUIDS["systemx86"])
@@ -134,7 +137,7 @@ def _appid_candidates(detail: AppDetail) -> set[str]:
         return candid
 
     ld = detail.lnk_detail
-    if ld is None or ld.target is None:
+    if not isinstance(ld, LnkDetail) or ld.target is None:
         return candid
     candid.add(appid_hex(ld.target))
     expanded = os.path.expandvars(ld.target).strip().strip('"')
@@ -243,11 +246,7 @@ def get_recent_files(details: list[AppDetail]) -> list[AppDetail]:
     for detail in details:
         candidates = _appid_candidates(detail)
         matched = prefixes & candidates
-        if (
-            not matched
-            and detail.type == "desktop"
-            and detail.path is not None
-        ):
+        if not matched and detail.type == "desktop" and detail.path is not None:
             aumid = _app_user_model_id(detail.path)
             if aumid:
                 matched = prefixes & {appid_hex(aumid)}
@@ -269,5 +268,14 @@ def get_recent_files(details: list[AppDetail]) -> list[AppDetail]:
             if len(unique) >= MAX_RECENT_FILES:
                 break
         if unique:
-            detail.recent_files = unique
+            detail.recent_files = [
+                RecentFile(
+                    p.name,
+                    Launch(f'start "" "{p}"', shell=True),
+                    path=p,
+                    icon=IconLoadMethod(LoadMethod.win32api, p),
+                )
+                for p in unique
+            ]
     return details
+

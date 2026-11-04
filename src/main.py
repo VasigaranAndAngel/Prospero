@@ -3,6 +3,9 @@ import sys
 from typing import TYPE_CHECKING
 
 import constants  # for update APP_STARTED_TIME  # noqa: F401
+from platform_specific import require_supported
+from platform_specific.cli import read_key
+from platform_specific.display import configure_qt_platform
 
 if TYPE_CHECKING:
     from providers import BaseResult
@@ -28,15 +31,13 @@ class CLIRenderer:
 
 
 def cli() -> None:
-    import msvcrt
     import string
 
-    from providers import PROVIDERS, ExecutionAction
+    from providers import PROVIDERS_I, ExecutionAction
 
-    # Prepare providers
-    providers: list[BaseProvider] = []
-    for provider in PROVIDERS:
-        providers.append(provider())
+    # Reuse the provider instances created on import. Building new ones would register the
+    # placeholder tokens a second time and raise.
+    providers: list[BaseProvider] = list(PROVIDERS_I)
 
     renderer = CLIRenderer()
 
@@ -45,7 +46,7 @@ def cli() -> None:
     query_buffer = ""
     first_res: BaseResult | None = None
     while True:
-        ch = msvcrt.getwch()
+        ch = read_key()
         match ch:
             case "\x03":
                 break
@@ -82,9 +83,11 @@ def ui() -> None:
     from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
     import assets
-    from hotkey_listener import HotkeyListener
+    from platform_specific.hotkeys import HotkeyListener
     from ui import MainWindow
     from updater import Updater
+
+    configure_qt_platform()
 
     app = QApplication(sys.argv)
 
@@ -118,6 +121,8 @@ def ui() -> None:
 
 
 def main() -> None:
+    require_supported()
+
     import logging
 
     from arg_parser import args
@@ -134,10 +139,10 @@ def main() -> None:
         logger = logging.getLogger(__name__)
 
         try:
-            from helpers import task_schedule_handler
+            from platform_specific.startup import start_listener
 
             logger.debug("Starting listener...")
-            _ = task_schedule_handler.start_listener(schtasks_handler[0], schtasks_handler[1])
+            _ = start_listener(schtasks_handler[0], schtasks_handler[1])
         except Exception as e:
             logger.error(f"Error running TaskScheduleHandler: {e}")
 

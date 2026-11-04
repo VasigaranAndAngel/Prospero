@@ -1,11 +1,11 @@
 # NOTE: Avoid importing too much because this will be imported on --schtasks-handler mode.
-import ctypes
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from packaging.version import Version
+
+from platform_specific import is_running_as_admin
 
 APPLICATION_NAME = "prospero"
 "Name of the application"
@@ -40,11 +40,7 @@ REPO_OWNER = "VasigaranAndAngel"
 REPO_NAME = "Prospero"
 # endregion
 
-try:
-    _as_admin = os.getuid() == 0
-except AttributeError:
-    _as_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0  # pyright: ignore[reportAny]
-RUNNING_AS_ADMIN: bool = _as_admin
+RUNNING_AS_ADMIN: bool = is_running_as_admin()
 
 APP_STARTED_TIME: datetime = datetime.now()
 

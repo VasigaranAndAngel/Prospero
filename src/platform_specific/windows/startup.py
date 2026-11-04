@@ -12,6 +12,7 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 from constants import APPLICATION_PATH, RUNNING_AS_ADMIN
+from platform_specific import CREATE_NO_WINDOW
 
 logger = logging.getLogger(__name__)  # This logger will be used in both main and elevated process.
 
@@ -28,7 +29,7 @@ def _run(args: Sequence[str]):
         capture_output=True,
         text=True,
         shell=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=CREATE_NO_WINDOW,
     )
     success = result.returncode == 0
     output = result.stdout if success else result.stderr

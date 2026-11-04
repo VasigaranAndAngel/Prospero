@@ -16,7 +16,6 @@ import logging
 import ntpath
 import os
 import stat
-import sys
 import zipfile
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -24,6 +23,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from constants import APPLICATION_NAME
+from platform_specific.paths import data_dir
 
 from ._allowlist import PackageError
 
@@ -43,10 +43,7 @@ def modules_root() -> Path:
     """
     if override := os.environ.get(f"{APPLICATION_NAME.upper()}_MODULES_PATH"):
         return Path(override)
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-        return Path(base) / APPLICATION_NAME.title() / "modules"
-    return Path.home() / ".local" / "share" / APPLICATION_NAME / "modules"
+    return data_dir() / "modules"
 
 
 def module_dir(name: str, version: str, root: Path | None = None) -> Path:

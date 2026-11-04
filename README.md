@@ -4,6 +4,9 @@
 
 <h1 align="center">Prospero</h1>
 
+<p align="center">
+  A fast, keyboard-driven launcher for Windows and Linux.
+</p>
 
 <p align="center">
   A fast, keyboard-driven command palette — Your pocket magician for quick needs. Everything you need, the moment you need it, solved the way you need it.
@@ -20,21 +23,32 @@
 
 ## Quick start
 
-**Option 1: installer (recommended)**
+**Option 1: installer / prebuilt package (recommended)**
+
+Windows:
 
 1. Go to the [Releases](https://github.com/VasigaranAndAngel/Prospero/releases) page.
 2. Download the latest `ProsperoSetup-*.exe`.
 3. Run the installer, then launch Prospero.
 4. Press `Alt + Space` anywhere to open it.
 
+Linux:
+
+1. Go to the [Releases](https://github.com/VasigaranAndAngel/Prospero/releases) page.
+2. Download the latest `Prospero-*-linux-x86_64.tar.gz` and extract it.
+3. From the extracted folder, run `./install.sh` to add Prospero to your application menu, or just launch `Prospero/Prospero` directly.
+4. Press `Alt + Space` anywhere to open it.
+
 **Option 2: run from source**
 
-You need Windows and Python >=3.12. The project uses [uv](https://docs.astral.sh/uv/) for dependencies.
+You need Python 3.12 (on Windows or Linux). The project uses [uv](https://docs.astral.sh/uv/) for dependencies.
 
-```powershell
+```sh
 uv sync --locked --all-extras --dev
-uv run python -m src.main
+uv run python src/main.py
 ```
+
+> On Linux, `pynput` needs access to the input devices for the global hotkey. It works out of the box on X11; under Wayland the `Alt + Space` hotkey may need the compositor to allow global shortcuts (see [FEATURES.md](docs/FEATURES.md)).
 
 ## Basic controls
 
@@ -57,7 +71,7 @@ Full details, examples, and developer notes for every item live in [FEATURES.md]
 
 **Providers**
 - **Calculator**: math, units, multiple sums, variables — *implemented* | *More planned*
-- **Applications**: launch Start Menu and UWP apps, optional recent files — *Partially implemented* | *More Planned*
+- **Applications**: launch Start Menu / UWP apps (Windows) or `.desktop` entries (Linux), optional recent files — *Partially implemented* | *More Planned*
 - **Commands**: power options, updater, version, etc. — *implemented* | *More planned*
 - **Color**, **File System**, **Volume**, **Terminal**, **Clipboard** and more — *planned*
 
@@ -79,7 +93,8 @@ Full details, examples, and developer notes for every item live in [FEATURES.md]
 Prospero keeps its settings in a single TOML file:
 
 ```
-%USERPROFILE%\.config\Prospero\Prospero.toml
+Windows: %USERPROFILE%\.config\Prospero\Prospero.toml
+Linux:   ~/.config/Prospero/Prospero.toml
 ```
 
 The file is created with sensible defaults the first time you run the app, and Prospero watches it, so changes apply without a restart. You can point at a different file with the `--config` argument. *Not implemented yet*
@@ -106,16 +121,19 @@ prospero [options]
 
 ## Build & development
 
-```powershell
+```sh
 # install everything (including dev tools if needed)
 uv sync --locked --all-extras --dev
 
 # run the tests
 uv run pytest
 
-# build a standalone executable
+# build a standalone app (Windows: dist/Prospero; Linux: dist/Prospero/)
 uv run PyInstaller prospero.spec --clean --noconfirm
 ```
+
+On Linux, the release tarball bundles `packaging/linux/install.sh` and a `.desktop` file so the
+frozen build can be installed into `~/.local` without root.
 
 ## License
 
