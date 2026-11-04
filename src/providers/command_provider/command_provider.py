@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Literal, overload, override
 
-from platform_specific import CREATE_NO_WINDOW
-
 from constants import APPLICATION_NAME, VERSION
 from fuzzy_finder import BaseChoice, IncrementalMatcher
-from platform_specific import startup
+from platform_specific import CREATE_NO_WINDOW, startup
+from shared_ui_elements import BaseResultBoxWidget
 
 from .._base_provider import BaseProvider
 from ..base_result import (
