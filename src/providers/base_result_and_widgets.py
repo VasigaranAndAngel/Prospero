@@ -134,8 +134,7 @@ class ResultBox(BaseResultBoxWidget):
         main_lay.setSpacing(10)
         main_lay.setContentsMargins(10, 10, 10, 10)
 
-        main_lay.addWidget(icon := Icon(result.icon_load_method, self))
-        icon.setFixedSize(40, 40)
+        main_lay.addWidget(icon := Icon(result.icon_load_method, 40, self))
         self._icon: Icon = icon
 
         main_lay.addLayout(txt_lay := QVBoxLayout())

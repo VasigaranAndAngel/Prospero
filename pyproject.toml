@@ -18,9 +18,19 @@ dependencies = [
     "pynput>=1.8.2",
     "pyqtgraph>=0.14.0",
     "pyside6>=6.11.1",
-    "pywin32>=312",
+    "pywin32>=312; sys_platform == 'win32'",
     "tomli-w>=1.2.0",
 ]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Environment :: X11 Applications :: Qt",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/VasigaranAndAngel/Prospero"
+Repository = "https://github.com/VasigaranAndAngel/Prospero"
 
 [project.optional-dependencies]
 build = [

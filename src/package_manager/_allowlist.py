@@ -116,6 +116,30 @@ PILLOW: Final[AllowedPackage] = AllowedPackage(
             ),
             requires_python=">=3.10",
         ),
+        "manylinux_x86_64": AllowedWheel(
+            filename=("pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"),
+            sha256="78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91",
+            size=6940830,
+            url=(
+                "https://files.pythonhosted.org/packages/84/21/"
+                "a35af28dcc61f37ed850a2d64c65c701321dfbf25085e469d5559360cbbf/"
+                "pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+            ),
+            requires_python=">=3.10",
+        ),
+        "manylinux_aarch64": AllowedWheel(
+            filename=(
+                "pillow-12.3.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl"
+            ),
+            sha256="d9c7f76c0673154f044e9d78c8655fb4213f6ca31a836df48b40fe5d187717b9",
+            size=6266838,
+            url=(
+                "https://files.pythonhosted.org/packages/25/27/"
+                "ac8f99618ffd3dde21db0f4d4b1d2ab00c0880595bfd17df103f7f39fd0c/"
+                "pillow-12.3.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl"
+            ),
+            requires_python=">=3.10",
+        ),
     },
 )
 

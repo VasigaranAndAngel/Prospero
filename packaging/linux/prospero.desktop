@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Prospero
+Comment=A fast, keyboard-driven launcher
+Exec=@EXEC@
+Icon=prospero
+Terminal=false
+Categories=Utility;
+Keywords=launcher;search;calculator;
+StartupNotify=false

@@ -1,6 +1,4 @@
 import logging
-import subprocess
-import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,9 +11,10 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QWidget
 
 from arg_parser import args
-from constants import APPLICATION_NAME, APPLICATION_PATH, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
+from constants import APPLICATION_NAME, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
 from helpers import SingletonQObjectMeta
 from network import Downloaded, NetworkClient, NetworkError
+from platform_specific.updater import run_installer
 
 logger = logging.getLogger(__name__)
 
@@ -179,25 +178,14 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
             self._network.cancel(url)
 
     def _run_installer(self, installer_path: Path) -> None:
-        cmd = [str(installer_path)]
+        if not run_installer(installer_path):
+            logger.warning(
+                "Automatic update installation is not implemented on this platform; "
+                + "downloaded %s but will not run it.",
+                installer_path,
+            )
+            return
 
-        if getattr(sys, "frozen", False):
-            install_dir = APPLICATION_PATH.parent
-            cmd.append("/silent")
-            cmd.append("/autostart")
-            cmd.append(f"/dir={install_dir}")
-        else:
-            cmd.append("/silent")
-            cmd.append("/autostart")
-            cmd.append(f"/dir={Path('./install_dir').resolve()}")
-
-        logger.debug(f"Starting installer: {cmd=}")
-        _ = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
         logger.debug("Quitting application for the update to complete.")
         ins = QApplication.instance()
         if ins is None:

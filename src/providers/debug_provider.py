@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, override
 
 from data_objects import IconLoadMethod, LoadMethod
 from fuzzy_finder import BaseChoice, IncrementalMatcher
-from helpers import task_schedule_handler
+from platform_specific import startup
 
 from ._base_provider import BaseProvider
 from ._loading_request import LoadingRequest
@@ -67,19 +67,19 @@ class DebugProvider(BaseProvider):
         choices.append(
             DebugResult(
                 text="Debug: Add Prospero Startup",
-                execute_=lambda: task_schedule_handler.add_task(print),
+                execute_=lambda: startup.add_task(print),
             )
         )
         choices.append(
             DebugResult(
                 text="Debug: Query Prospero Startup",
-                execute_=lambda: task_schedule_handler.query_task(print),
+                execute_=lambda: startup.query_task(print),
             )
         )
         choices.append(
             DebugResult(
                 text="Debug: Remove Prospero Startup",
-                execute_=lambda: task_schedule_handler.remove_task(print),
+                execute_=lambda: startup.remove_task(print),
             )
         )
         choices.append(DebugResult(text="Debug: Get first snapshot", execute_=_get_first_snapshot))

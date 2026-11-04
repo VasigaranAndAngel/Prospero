@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Literal, overload, override
 
+from platform_specific import CREATE_NO_WINDOW
+
 from constants import APPLICATION_NAME, VERSION
 from fuzzy_finder import BaseChoice, IncrementalMatcher
-from helpers import task_schedule_handler
+from platform_specific import startup
 
 from .._base_provider import BaseProvider
 from ..base_result_and_widgets import (
@@ -17,7 +19,7 @@ from ..base_result_and_widgets import (
     ExecutionAction,
     ResultAttributes,
 )
-from ._shutdown import shutdown_respect_hybrid
+from ._power import hibernate, lock, restart, shutdown, sleep
 from ._updater_result_widget import UpdaterResultWidget
 
 logger = logging.getLogger(__name__)
@@ -74,9 +76,9 @@ class Command:
         if self.command_type == "shell" and isinstance(self.command, str):
             res = subprocess.run(
                 self.command,
-                creationflags=subprocess.CREATE_NO_WINDOW,  # Windows only
-                stdout=subprocess.DEVNULL,  # mac and linux
-                stderr=subprocess.DEVNULL,  # mac and linux
+                creationflags=CREATE_NO_WINDOW,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             logger.debug(res.stderr)  # TODO: remove?
 
@@ -92,22 +94,20 @@ class Command:
 _COMMANDS: dict[str, Command] = {
     "Quit": (x := Command("func", sys.exit, "Quits the application")),
     "q": x,
-    "Power: Shutdown": Command("func", shutdown_respect_hybrid, "Shuts down the computer"),
-    "Power: Restart": Command("shell", "shutdown.exe /r /t 0", "Restarts the computer"),
-    "Power: Hibernate": Command("shell", "shutdown.exe /h", "Hibernates the computer"),
-    "Power: Sleep": Command("shell", "", "Puts the computer to sleep"),  # TODO: sleeping isn't easy
-    "Power: Lock": Command(
-        "shell", "rundll32.exe user32.dll,LockWorkStation", "Locks the current user account"
-    ),
+    "Power: Shutdown": Command("func", shutdown, "Shuts down the computer"),
+    "Power: Restart": Command("func", restart, "Restarts the computer"),
+    "Power: Hibernate": Command("func", hibernate, "Hibernates the computer"),
+    "Power: Sleep": Command("func", sleep, "Puts the computer to sleep"),
+    "Power: Lock": Command("func", lock, "Locks the current user account"),
     "Updater": Command(None, None, f"Update {APPLICATION_NAME.title()}", UpdaterResultWidget),
     f"Add {APPLICATION_NAME.title()} to Scheduled Tasks": Command(
         "func",
-        partial(task_schedule_handler.add_task, lambda x: None),
+        partial(startup.add_task, lambda x: None),
         f"Adds {APPLICATION_NAME.title()} to scheduled tasks to start on current user log on.",
     ),
     f"Remove {APPLICATION_NAME.title()} from Scheduled Tasks": Command(
         "func",
-        partial(task_schedule_handler.remove_task, lambda x: None),
+        partial(startup.remove_task, lambda x: None),
         f"Removes {APPLICATION_NAME.title()} from scheduled tasks.",
     ),
     "Version": Command(None, None, f"Current version of {APPLICATION_NAME.title()} is {VERSION}"),
