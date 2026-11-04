@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v0.1.0-alpha.6 (2026-11-04)
+
+### Documentation
+
+- Adding readme.md and docs/features.md
+  ([`5ed56bc`](https://github.com/VasigaranAndAngel/Prospero/commit/5ed56bcdbfad31761eb9ad0bff9a555dc23d9c1a))
+
+- Few fixes to readme.md
+  ([`25e73b4`](https://github.com/VasigaranAndAngel/Prospero/commit/25e73b43218089cb25274490144707f250fde5d4))
+
+### Features
+
+- Launching application detached.
+  ([`251c324`](https://github.com/VasigaranAndAngel/Prospero/commit/251c324527339fb4ae032236ad2fdd9acb7f1780))
+
+### Refactoring
+
+- Application icon lookup improvements in linux
+  ([`1a7bd82`](https://github.com/VasigaranAndAngel/Prospero/commit/1a7bd82b36870349fd19ebf6e96147bda9494ae2))
+
+- Platform_specific module where all platform specific codes
+  ([`5326821`](https://github.com/VasigaranAndAngel/Prospero/commit/53268213f99da6a9d2d3a5656d6524c66712b1c2))
+
+
 ## v0.1.0-alpha.5 (2026-10-10)
 
 ### Bug Fixes
