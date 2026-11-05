@@ -13,7 +13,7 @@ from helpers import SingletonQObjectMeta
 # use an attribute to narrow an isinstance check.
 from network import NetworkError
 from shared_ui_elements import ResultBox
-from updater import Downloaded, GithubLatestRelease, Updater
+from updater import Downloaded, GithubLatestRelease, UpdateInfo, Updater, UpdateStatus
 
 from ..base_result import BaseResult, ExecutionAction
 
@@ -31,13 +31,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         super().__init__(text, result, parent)
 
         self._updater: Updater = Updater()
-        _ = self._updater.downloaded.connect(self._update_download_state)
-        _ = self._updater.download_started.connect(self._on_download_started)
-        _ = self._updater.update_checked.connect(self._on_update_checked)
-
-        self._update_checking: bool = False
-        self._update_progress: bool = False
-        self._latest_release: GithubLatestRelease | None = None
+        _ = self._updater.update_info_updated.connect(self._on_update_info)
 
         self._update_name_and_description()
 
@@ -53,9 +47,35 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self._progress2_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
         _ = self._progress2_anim.finished.connect(self.repaint)  # progress_anim repaints each frame
 
+    def _on_update_info(self, update_info: UpdateInfo) -> None:
+        if (er := update_info.error) is not None:
+            if isinstance(er, NetworkError):
+                er_str = er.error_str
+            else:
+                er_str = str(er)
+            self.set_description(
+                f"{update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
+            )
+            return
+
+        match update_info.state:
+            case UpdateStatus.none:
+                pass
+            case UpdateStatus.update_checking:
+                pass
+            case UpdateStatus.update_checked:
+                self._on_update_checked(update_info.latest_release)
+            case UpdateStatus.download_aborted:
+                self._on_update_aborted()
+            case UpdateStatus.download_started:
+                self._on_download_started()
+            case UpdateStatus.downloading | UpdateStatus.downloaded:
+                if update_info.download_progress is not None:
+                    self._update_download_state(update_info.download_progress)
+            case _:  # TODO: handle other status
+                pass
+
     def _update_download_state(self, download_state: Downloaded) -> None:
-        if download_state.aborted:
-            return self._on_update_aborted()
         x = "Downloaded" if download_state.completed else "Downloading"
         f = download_state.file_path.name
         d = readable_size(download_state.downloaded_size)
@@ -69,38 +89,41 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
 
     def _on_download_started(self) -> None:
         self._icon.update_load_method(IconLoadMethod(LoadMethod.loading))
-        self._update_progress = True
 
     def _on_update_aborted(self) -> None:
         self._update_progress_bar(0.0)
         self._icon.update_load_method(IconLoadMethod(LoadMethod.default))
-        self._update_progress = False
         self.set_description("Update aborted")
         QTimer.singleShot(1500, self._update_name_and_description)
 
     def _on_update_checked(self, release: GithubLatestRelease | NetworkError | None) -> None:
-        self._update_checking = False
-        self._latest_release = None
-
         if isinstance(release, NetworkError):
             desc = release.error_str
         elif release is None:
             desc = "No updates available."
         else:
-            self._latest_release = release
             desc = f"Version {release.tag_name} available."
 
         self.set_description(desc)
         QTimer.singleShot(len(desc) * 80, self._update_name_and_description)
 
     def _update_name_and_description(self) -> None:
-        if self._latest_release is None:
+        if (er := self._updater.update_info.error) is not None:
+            if isinstance(er, NetworkError):
+                er_str = er.error_str
+            else:
+                er_str = str(er)
+            self.set_description(
+                f"{self._updater.update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
+            )
+            return
+        if self._updater.update_info.latest_release is None:
             self.set_name("Check for update")
             self.set_description(f"Checks if new version of {APPLICATION_NAME.title()} available.")
         else:
             self.set_name(f"Update {APPLICATION_NAME.title()}")
             self.set_description(
-                f"Update {APPLICATION_NAME.title()} from {VERSION} to {self._latest_release.tag_name}."
+                f"Update {APPLICATION_NAME.title()} from {VERSION} to {self._updater.update_info.latest_release.tag_name}."
             )
 
     def _update_progress_bar(self, value: float) -> None:
@@ -112,30 +135,33 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self._progress2_anim.start()
 
     def _check_for_update(self) -> None:
-        if not self._update_checking:
-            self._update_checking = True
+        if self._updater.update_info.state is UpdateStatus.none:
             self.set_description("Checking for updates...")
             self._updater.check_update()
-
-    @classmethod
-    def set_latest_release(cls, release: GithubLatestRelease) -> None:
-        cls._latest_release = release
 
     @override
     def request_deletion(self) -> None:
         self.hide()
 
     @override
+    def update_result(self, new_result: "BaseResult") -> None:
+        super().update_result(new_result)
+        self._update_name_and_description()
+
+    @override
     def execute_execution_action(self, action: ExecutionAction) -> None:
         if action is ExecutionAction.Trigger:
-            if self._latest_release is None:
+            if self._updater.update_info.state is UpdateStatus.none:
                 self._check_for_update()
             else:
-                if self._update_progress:
+                if self._updater.update_info.state in {
+                    UpdateStatus.download_started,
+                    UpdateStatus.downloading,
+                }:
                     self._updater.cancel_update()
-                else:
+                elif self._updater.update_info.latest_release is not None:
                     self.set_description("Preparing to update...")
-                    self._updater.update(self._latest_release)
+                    _ = self._updater.download(self._updater.update_info.latest_release)
         else:
             return super().execute_execution_action(action)
 
