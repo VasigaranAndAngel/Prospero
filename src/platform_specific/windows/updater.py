@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -9,9 +10,9 @@ from pathlib import Path
 from constants import APPLICATION_PATH
 from platform_specific import CREATE_NO_WINDOW
 
-import logging
-
 logger = logging.getLogger(__name__)
+
+FILE_MATCH_PAT: str = "*-linux-*.tar.gz"
 
 
 def run_installer(installer_path: Path) -> bool:

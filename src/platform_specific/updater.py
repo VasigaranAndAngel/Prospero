@@ -7,11 +7,11 @@ from pathlib import Path
 from . import IS_LINUX, IS_WINDOWS, UnsupportedPlatformError
 
 if IS_WINDOWS:
-    from .windows.updater import run_installer
+    from .windows.updater import FILE_MATCH_PAT, run_installer
 elif IS_LINUX:
-    from .linux.updater import run_installer
+    from .linux.updater import FILE_MATCH_PAT, run_installer
 else:
     raise UnsupportedPlatformError("automatic update installation")
 
 
-__all__ = ["Path", "run_installer"]
+__all__ = ["Path", "run_installer", "FILE_MATCH_PAT"]

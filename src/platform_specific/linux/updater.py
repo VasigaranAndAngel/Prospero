@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+FILE_MATCH_PAT: str = "ProsperoSetup-*.exe"
+
 
 def run_installer(installer_path: Path) -> bool:
     """Report that the downloaded file was not started."""

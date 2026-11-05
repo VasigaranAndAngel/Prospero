@@ -1,3 +1,5 @@
+import fnmatch
+from hashlib import file_digest, sha256
 import logging
 import tempfile
 from collections.abc import Callable
@@ -14,7 +16,7 @@ from arg_parser import args
 from constants import APPLICATION_NAME, APPLICATION_VERSION, REPO_NAME, REPO_OWNER
 from helpers import SingletonQObjectMeta
 from network import Downloaded, NetworkClient, NetworkError
-from platform_specific.updater import run_installer
+from platform_specific.updater import run_installer, FILE_MATCH_PAT
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +146,13 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         if self._update_progress:
             return
 
-        file_asset = release.assets[0]
+        # select the asset
+        assets = tuple(filter(lambda x: fnmatch.fnmatch(x.name, FILE_MATCH_PAT), release.assets))
+        if (x := len(assets)) != 1:
+            logger.error(f"Aborting update due to {x} update assets found.")
+            return
+        file_asset = assets[0]
+
         tmp_dir = tempfile.mkdtemp(prefix=APPLICATION_NAME.title() + " Installer")
         file_path = Path(tmp_dir) / file_asset.name
         url = file_asset.browser_download_url
@@ -160,6 +168,20 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                 self._download_url = None
             self.downloaded.emit(state)
             if state.completed:
+                # verify size
+                if not state.file_path.exists() or state.file_path.stat().st_size != file_asset.size:
+                    # TODO: cleanup process
+                    pass
+
+                # verify digest
+                if file_asset.digest is not None:
+                    with open(state.file_path, "rb") as f:
+                        digest = file_digest(f, "sha256").hexdigest()
+                    if digest.casefold() != file_asset.digest.casefold():
+                        # TODO: cleanup process
+                        pass
+
+                # start installer
                 QTimer.singleShot(1000, lambda: self._run_installer(state.file_path))
 
         self._network.download(url, file_path, _on_downloaded)
