@@ -155,8 +155,9 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         self.download_started.emit()
 
         def _on_downloaded(state: Downloaded) -> None:
-            self._update_progress = not (state.completed or state.aborted)
-            self._download_url = None
+            if state.aborted or state.completed:
+                self._update_progress = False
+                self._download_url = None
             self.downloaded.emit(state)
             if state.completed:
                 QTimer.singleShot(1000, lambda: self._run_installer(state.file_path))
