@@ -12,7 +12,7 @@ from platform_specific import CREATE_NO_WINDOW
 
 logger = logging.getLogger(__name__)
 
-FILE_MATCH_PAT: str = "*-linux-*.tar.gz"
+FILE_MATCH_PAT: str = "ProsperoSetup-*.exe"
 
 
 def run_installer(installer_path: Path) -> bool:
