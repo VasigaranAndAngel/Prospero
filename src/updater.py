@@ -72,13 +72,14 @@ class UpdateStatus(Enum):
 
 
 @dataclass
-class UpdateProgress:
+class InstallProgress:
     total: float
-    completed: float
+    installed: float
+    completed: bool
 
     @property
     def ratio(self) -> float:
-        return self.completed / self.total
+        return self.installed / self.total
 
 
 @dataclass
@@ -89,7 +90,7 @@ class UpdateInfo:
     update_available: bool | None = None
     latest_release: GithubLatestRelease | None = None
     download_progress: Downloaded | None = None
-    install_progress: UpdateProgress | None = None
+    install_progress: InstallProgress | None = None
     error: Exception | NetworkError | None = None
     domain: str | None = None
 

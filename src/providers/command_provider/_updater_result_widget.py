@@ -13,7 +13,12 @@ from helpers import SingletonQObjectMeta
 # use an attribute to narrow an isinstance check.
 from network import NetworkError
 from shared_ui_elements import ResultBox
-from updater import Downloaded, GithubLatestRelease, UpdateInfo, Updater, UpdateStatus
+from updater import (
+    Downloaded,
+    UpdateInfo,
+    Updater,
+    UpdateStatus,
+)
 
 from ..base_result import BaseResult, ExecutionAction
 
@@ -33,6 +38,19 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self._updater: Updater = Updater()
         _ = self._updater.update_info_updated.connect(self._on_update_info)
 
+        self._delayed_info_timer: QTimer = QTimer(self, singleShot=True, interval=3000)
+        _ = self._delayed_info_timer.timeout.connect(self._on_delayed_info_timeout)
+        self._delayed_name: str | None = None
+        self._delayed_desc: str | None = None
+        self._delayed_icon: IconLoadMethod | None = None
+
+        self._checked_update_timeout: QTimer = QTimer(
+            self,
+            singleShot=True,
+            interval=1000 * 60 * 30,  # 30 minutes
+        )
+        _ = self._checked_update_timeout.timeout.connect(self._on_checked_update_timeout)
+
         self._update_name_and_description()
 
         _ = self.setProperty("_progress", 0.0)
@@ -47,35 +65,118 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self._progress2_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
         _ = self._progress2_anim.finished.connect(self.repaint)  # progress_anim repaints each frame
 
-    def _on_update_info(self, update_info: UpdateInfo) -> None:
-        if (er := update_info.error) is not None:
+    def _on_update_info(self, _update_info: UpdateInfo) -> None:
+        self._update_name_and_description()
+
+    def _update_name_and_description(self) -> None:
+        ui = self._updater.update_info
+
+        name = "Check for update"
+        desc = f"Checks if new version of {APPLICATION_NAME.title()} available."
+        icon = IconLoadMethod(LoadMethod.default)
+
+        if (er := self._updater.update_info.error) is not None:
             if isinstance(er, NetworkError):
                 er_str = er.error_str
             else:
                 er_str = str(er)
-            self.set_description(
-                f"{update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
+            desc2 = desc
+            desc = (
+                f"{self._updater.update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
             )
-            return
+            self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
 
-        match update_info.state:
-            case UpdateStatus.none:
-                pass
-            case UpdateStatus.update_checking:
-                pass
-            case UpdateStatus.update_checked:
-                self._on_update_checked(update_info.latest_release)
-            case UpdateStatus.download_aborted:
-                self._on_update_aborted()
-            case UpdateStatus.download_started:
-                self._on_download_started()
-            case UpdateStatus.downloading | UpdateStatus.downloaded:
-                if update_info.download_progress is not None:
-                    self._update_download_state(update_info.download_progress)
-            case _:  # TODO: handle other status
-                pass
+            if ui.state in {UpdateStatus.update_checking, UpdateStatus.update_checked}:
+                ui.state = UpdateStatus.none
+            elif ui.state in {
+                UpdateStatus.download_started,
+                UpdateStatus.downloading,
+                UpdateStatus.download_aborted,
+            }:
+                ui.state = UpdateStatus.update_checked
+            elif ui.state in {
+                UpdateStatus.installation_started,
+                UpdateStatus.installing,
+                UpdateStatus.installation_queue,
+            }:
+                ui.state = UpdateStatus.downloaded
 
-    def _update_download_state(self, download_state: Downloaded) -> None:
+        else:
+            match ui.state:
+                case UpdateStatus.none:
+                    pass
+                case UpdateStatus.update_checking:
+                    name = "Check for update"
+                    desc = f"Checking if new version of {APPLICATION_NAME.title()} available."
+                    icon = IconLoadMethod(LoadMethod.loading)
+                case UpdateStatus.update_checked:
+                    if ui.update_available is None:
+                        desc2 = desc  # default description after delay
+                        desc = f"No new version of {APPLICATION_NAME.title()} available."
+                    else:
+                        name = f"Update {APPLICATION_NAME.title()}"
+                        if ui.latest_release is None:  # if it is None unexpectedly
+                            desc = f"New version of {APPLICATION_NAME.title()} available."
+                            desc2 = (
+                                f"Update {APPLICATION_NAME.title()} from {VERSION} to new version."
+                            )
+                        else:
+                            desc = f"New version {ui.latest_release.tag_name} of {APPLICATION_NAME.title()} available."
+                            desc2 = f"Update {APPLICATION_NAME.title()} from {VERSION} to {ui.latest_release.tag_name}."
+                    self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
+                    self._checked_update_timeout.stop()
+                    self._checked_update_timeout.start()
+                case UpdateStatus.download_started:
+                    name = "Updating"
+                    icon = IconLoadMethod(LoadMethod.loading)
+                    desc = "Preparing download..."
+                case UpdateStatus.downloading:
+                    name = "Updating"
+                    icon = IconLoadMethod(LoadMethod.loading)
+                    dp = ui.download_progress
+                    if dp is not None:
+                        desc = self._build_download_state(dp)
+                        self._update_progress_bar(dp.download_progress)
+                    else:
+                        desc = "Downloading"
+                case UpdateStatus.downloaded:
+                    name = "Updating"
+                    desc = "Downloaded"
+                case UpdateStatus.download_aborted:
+                    desc2 = desc
+                    desc = "Download aborted"
+                    self._update_progress_bar(0.0)
+                    self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
+                case UpdateStatus.installation_queue:
+                    name = "Updating"
+                    desc = "Installation queue"
+                case UpdateStatus.installation_started:
+                    name = "Updating"
+                    desc = "Preparing to install..."
+                    icon = IconLoadMethod(LoadMethod.loading)
+                    self._update_progress_bar(0.0)
+                case UpdateStatus.installing:
+                    name = "Updating"
+                    ip = ui.install_progress
+                    if ip is not None:
+                        desc = f"Installing {ip.ratio * 100:.2f}%"
+                        self._update_progress_bar(ip.ratio)
+                    else:
+                        desc = "Installing..."
+                    icon = IconLoadMethod(LoadMethod.loading)
+                case UpdateStatus.installed:
+                    desc = "Installed"
+                    self._update_progress_bar(0.0)
+                case UpdateStatus.restart_queue:
+                    name = f"Restart {APPLICATION_NAME.title()}"
+                    desc = "Need restart"
+
+        self.set_name(name)
+        self.set_description(desc)
+        self._icon.update_load_method(icon)
+
+    @staticmethod
+    def _build_download_state(download_state: Downloaded) -> str:
         x = "Downloaded" if download_state.completed else "Downloading"
         f = download_state.file_path.name
         d = readable_size(download_state.downloaded_size)
@@ -84,47 +185,32 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         s = f"{readable_size(download_state.speed)}/s" if download_state.speed is not None else ""
         # Downloading ProsperoSetup-0.0.1.exe    15MiB/40MiB (20.0%)    5MiB/s
         desc = f"{x} {f}    {d}/{t} ({p})    {s}"
-        self.set_description(desc)
-        self._update_progress_bar(download_state.download_progress)
+        return desc
 
-    def _on_download_started(self) -> None:
-        self._icon.update_load_method(IconLoadMethod(LoadMethod.loading))
+    def _set_delayed_info(
+        self,
+        name: str | None = None,
+        desc: str | None = None,
+        icon: IconLoadMethod | None = None,
+        interval: int = 3000,
+    ) -> None:
+        if self._delayed_info_timer.isActive():
+            self._delayed_info_timer.stop()
+        self._delayed_name = name
+        self._delayed_desc = desc
+        self._delayed_icon = icon
+        if any(x is not None for x in {name, desc, icon}):
+            self._delayed_info_timer.setInterval(interval)
+            self._delayed_info_timer.start()
 
-    def _on_update_aborted(self) -> None:
-        self._update_progress_bar(0.0)
-        self._icon.update_load_method(IconLoadMethod(LoadMethod.default))
-        self.set_description("Update aborted")
-        QTimer.singleShot(1500, self._update_name_and_description)
-
-    def _on_update_checked(self, release: GithubLatestRelease | NetworkError | None) -> None:
-        if isinstance(release, NetworkError):
-            desc = release.error_str
-        elif release is None:
-            desc = "No updates available."
-        else:
-            desc = f"Version {release.tag_name} available."
-
-        self.set_description(desc)
-        QTimer.singleShot(len(desc) * 80, self._update_name_and_description)
-
-    def _update_name_and_description(self) -> None:
-        if (er := self._updater.update_info.error) is not None:
-            if isinstance(er, NetworkError):
-                er_str = er.error_str
-            else:
-                er_str = str(er)
-            self.set_description(
-                f"{self._updater.update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
-            )
-            return
-        if self._updater.update_info.latest_release is None:
-            self.set_name("Check for update")
-            self.set_description(f"Checks if new version of {APPLICATION_NAME.title()} available.")
-        else:
-            self.set_name(f"Update {APPLICATION_NAME.title()}")
-            self.set_description(
-                f"Update {APPLICATION_NAME.title()} from {VERSION} to {self._updater.update_info.latest_release.tag_name}."
-            )
+    def _on_delayed_info_timeout(self) -> None:
+        name, desc, icon = self._delayed_name, self._delayed_desc, self._delayed_icon
+        if name is not None:
+            self.set_name(name)
+        if desc is not None:
+            self.set_description(desc)
+        if icon is not None:
+            self._icon.update_load_method(icon)
 
     def _update_progress_bar(self, value: float) -> None:
         self._progress_anim.stop()
@@ -139,13 +225,17 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
             self.set_description("Checking for updates...")
             self._updater.check_update()
 
+    def _on_checked_update_timeout(self) -> None:
+        self._updater.update_info.state = UpdateStatus.none
+
     @override
     def request_deletion(self) -> None:
         self.hide()
 
     @override
     def update_result(self, new_result: "BaseResult") -> None:
-        super().update_result(new_result)
+        # super().update_result(new_result)
+        self.result = new_result  # pyright: ignore[reportUnannotatedClassAttribute]
         self._update_name_and_description()
 
     @override
