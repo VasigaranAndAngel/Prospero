@@ -71,20 +71,31 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
     def _update_name_and_description(self) -> None:
         ui = self._updater.update_info
 
+        self._set_delayed_info()  # stop the timer and delayed info
         name = "Check for update"
         desc = f"Checks if new version of {APPLICATION_NAME.title()} available."
         icon = IconLoadMethod(LoadMethod.default)
 
         if (er := self._updater.update_info.error) is not None:
+            pass
+        elif (dp := self._updater.update_info.download_progress) is not None and dp.aborted:
+            er = dp.abort_reason
+            print(f"download er: {object.__repr__(dp.abort_reason)}")
+
+        er_str = None
+        if er is not None:
             if isinstance(er, NetworkError):
                 er_str = er.error_str
             else:
                 er_str = str(er)
+
+        if er_str is not None:
             desc2 = desc
             desc = (
                 f"{self._updater.update_info.state.name.replace('_', ' ').title()} Error: {er_str}"
             )
-            self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
+            self._set_delayed_info(desc=desc2, interval=len(desc) * 65)
+            self._update_progress_bar(0.0)
 
             if ui.state in {UpdateStatus.update_checking, UpdateStatus.update_checked}:
                 ui.state = UpdateStatus.none
@@ -94,12 +105,15 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                 UpdateStatus.download_aborted,
             }:
                 ui.state = UpdateStatus.update_checked
+                ui.download_progress = None
+                ui.install_progress = None
             elif ui.state in {
                 UpdateStatus.installation_started,
                 UpdateStatus.installing,
                 UpdateStatus.installation_queue,
             }:
                 ui.state = UpdateStatus.downloaded
+                ui.install_progress = None
 
         else:
             match ui.state:
@@ -123,7 +137,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                         else:
                             desc = f"New version {ui.latest_release.tag_name} of {APPLICATION_NAME.title()} available."
                             desc2 = f"Update {APPLICATION_NAME.title()} from {VERSION} to {ui.latest_release.tag_name}."
-                    self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
+                    self._set_delayed_info(desc=desc2, interval=len(desc) * 65)
                     self._checked_update_timeout.stop()
                     self._checked_update_timeout.start()
                 case UpdateStatus.download_started:
@@ -146,7 +160,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                     desc2 = desc
                     desc = "Download aborted"
                     self._update_progress_bar(0.0)
-                    self._set_delayed_info(desc=desc2, interval=len(desc2) * 65)
+                    self._set_delayed_info(desc=desc2, interval=len(desc) * 65)
                 case UpdateStatus.installation_queue:
                     name = "Updating"
                     desc = "Installation queue"

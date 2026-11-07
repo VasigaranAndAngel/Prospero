@@ -244,7 +244,10 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
         if self.offline:
             logger.warning("Refusing to download %s. %s", uri, OFFLINE_ERROR)
             _ = self._emit_downloaded(
-                Downloaded(0, 0, 0, False, file_path, aborted=True, url=uri), callback
+                Downloaded(
+                    0, 0, 0, False, file_path, aborted=True, abort_reason=OFFLINE_ERROR, url=uri
+                ),
+                callback,
             )
             return
 
@@ -255,7 +258,8 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
         except OSError as e:
             logger.warning("Cannot write download of %s to %s: %s", uri, file_path, e)
             _ = self._emit_downloaded(
-                Downloaded(0, 0, 0, False, file_path, aborted=True, url=uri), callback
+                Downloaded(0, 0, 0, False, file_path, aborted=True, abort_reason=e, url=uri),
+                callback,
             )
             return
 
@@ -306,6 +310,7 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
                             False,
                             file_path,
                             aborted=True,
+                            abort_reason=e,
                             url=uri,
                         ),
                         callback,
@@ -335,6 +340,7 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
                         False,
                         file_path,
                         aborted=True,
+                        abort_reason=error,
                         url=uri,
                     ),
                     callback,

@@ -51,4 +51,6 @@ class Downloaded:
     "Average bytes per second since the transfer began. None if not measurable."
     aborted: bool = False
     "The transfer stopped before completing: cancelled, refused or failed."
+    abort_reason: NetworkError | Exception | str | None = None
+    "The reason/NetworkError/Exception of abortion."
     url: str = ""
