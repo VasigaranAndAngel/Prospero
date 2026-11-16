@@ -1709,12 +1709,12 @@ Check for new versions on GitHub and install them.
 <details>
 <summary><b>How to use</b></summary>
 
-Use the `Updater` command. The latest release is fetched, downloaded, and (on Windows) the installer is launched quietly.
+Use the `Updater` command. The latest release is fetched, downloaded, verified, extracted into a new version directory, and the app restarts into it. Download and extraction both show progress in the result widget, and either phase can be cancelled with Enter.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-`src/updater.py` fetches the latest release from the GitHub API, downloads the first asset, verifies progress, and on Windows runs the installer with `/silent`, `/autostart`, and `/dir=...`. On Linux the download is skipped for installation because there is no Inno Setup equivalent yet — the update check still works, but installing is manual (download the new tarball and re-run `install.sh`).
+`src/updater.py` fetches the latest release from the GitHub API and selects exactly one platform asset (`*-windows-*.zip` or `*-linux-*.tar.gz`). It verifies the advertised size and `sha256` digest, extracts with traversal checks into `versions/<version>/`, then asks the platform layer to activate it. Windows writes `pending.txt` and starts `ProsperoLauncher.exe --wait-pid <pid>`; the launcher waits for the old process, promotes `current.txt` and starts the new version. Linux atomically swaps the `current` symlink and restarts through `~/.local/bin/prospero`. Cleanup keeps the current and previous versions for rollback. Running from source can check for updates but refuses automatic installation.
 </details>
 </details>
 

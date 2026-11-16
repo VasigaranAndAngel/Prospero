@@ -1,11 +1,16 @@
-"""Tests for the updater, which now sits on top of the shared network client.
+"""Tests for the updater state machine and update archive extraction.
 
-The installer is never actually launched: ``_run_installer`` is stubbed wherever a test lets a
-download finish.
+Downloads go through the fixture HTTP server. Installation is exercised separately by calling
+the worker directly, so no test depends on a real launcher or on QApplication quitting.
 """
 
+import io
 import json
-from collections.abc import Callable
+import sys
+import tarfile
+import zipfile
+from collections.abc import Callable, Iterator
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -15,16 +20,54 @@ from arg_parser import args
 from constants import APPLICATION_VERSION
 from helpers.singleton_meta import SingletonMeta
 from network import Downloaded, NetworkClient, NetworkError
-from updater import GithubLatestRelease, Updater
+from platform_specific import IS_WINDOWS
+from platform_specific.paths import app_executable, version_dir
+from platform_specific.updater import APP_EXECUTABLE_NAME
+from updater import GithubLatestRelease, UpdateInfo, Updater, UpdateStatus
 
 Pump = Callable[[Callable[[], bool]], bool]
+
+ORIGINAL_INSTALL = Updater.install
+"The autouse fixture stubs this; the end-to-end test restores it."
 
 BAD_PAYLOAD: bytes = b'{"unexpected": true}'
 "Valid JSON that does not match the GithubLatestRelease model."
 
 
-def release_payload(tag: str, asset_url: str, asset_size: int) -> bytes:
-    """Builds a GitHub release payload shaped like the real API response."""
+def archive_suffix() -> str:
+    return "windows-x86_64.zip" if IS_WINDOWS else "linux-x86_64.tar.gz"
+
+
+def archive_name(tag: str = "99.0.0") -> str:
+    return f"Prospero-{tag}-{archive_suffix()}"
+
+
+def make_archive(files: dict[str, bytes]) -> bytes:
+    """Build a small update archive in the same shape the release workflow publishes."""
+    buffer = io.BytesIO()
+    if IS_WINDOWS:
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for name, data in files.items():
+                archive.writestr(name, data)
+    else:
+        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+            for name, data in files.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                info.mode = 0o755
+                archive.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def release_payload(
+    tag: str,
+    asset_url: str,
+    asset_size: int,
+    *,
+    asset_name: str | None = None,
+    digest: str | None = None,
+) -> bytes:
+    """Build a GitHub release payload shaped like the real API response."""
     return json.dumps(
         {
             "tag_name": tag,
@@ -33,36 +76,52 @@ def release_payload(tag: str, asset_url: str, asset_size: int) -> bytes:
             "assets": [
                 {
                     "browser_download_url": asset_url,
-                    "name": "ProsperoSetup.exe",
+                    "name": asset_name or archive_name(tag),
                     "label": None,
                     "state": "uploaded",
                     "content_type": "application/octet-stream",
                     "size": asset_size,
-                    "digest": None,
+                    "digest": digest,
                 }
             ],
         }
     ).encode()
 
 
-@pytest.fixture
-def updater(monkeypatch: pytest.MonkeyPatch) -> Updater:
-    """A fresh Updater wired to the fixture's NetworkClient."""
-    monkeypatch.setattr(args, "update_domain", None)
-    monkeypatch.delitem(SingletonMeta._instances, Updater, raising=False)  # pyright: ignore[reportPrivateUsage]
-    return Updater()
+def release_from(base_url: str, payload: bytes) -> GithubLatestRelease:
+    NetworkClient.set_base_url("github", base_url)
+    return GithubLatestRelease.model_validate_json(payload)
 
 
 @pytest.fixture(autouse=True)
-def no_installer(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(Updater, "_run_installer", lambda self, path: None)  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-
-
-@pytest.fixture(autouse=True)
-def default_release_payload(http_server: Any) -> Any:  # pyright: ignore[reportAny, reportExplicitAny]
-    """Keeps one test's release payload from deciding the next test's result."""
+def default_server_state(http_server: Any) -> None:  # pyright: ignore[reportAny, reportExplicitAny]
+    """Keep one test's server payload from deciding the next test's result."""
     http_server.release_payload = BAD_PAYLOAD
-    return http_server  # pyright: ignore[reportAny]
+    http_server.update_bytes = b""
+
+
+@pytest.fixture(autouse=True)
+def block_auto_install(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Download tests must not race the automatic installer timer."""
+    monkeypatch.setattr(Updater, "install", lambda self, path: True)
+
+
+@pytest.fixture
+def updater(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> Iterator[Updater]:
+    """A fresh Updater with an isolated install root and the fixture's NetworkClient."""
+    monkeypatch.setattr(args, "update_domain", None)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr("updater._can_self_update", lambda: True)
+    monkeypatch.setenv("PROSPERO_INSTALL_ROOT", str(tmp_path / "install"))
+    monkeypatch.delitem(SingletonMeta._instances, Updater, raising=False)  # pyright: ignore[reportPrivateUsage]
+    instance = Updater()
+    yield instance
+    instance.cancel_update()
+    monkeypatch.delitem(SingletonMeta._instances, Updater, raising=False)  # pyright: ignore[reportPrivateUsage]
 
 
 # region public surface
@@ -122,29 +181,15 @@ def test_offline_get_latest_release_reports_error(offline: NetworkClient, update
 
 
 def test_offline_check_update_emits_error(offline: NetworkClient, updater: Updater) -> None:  # pyright: ignore[reportUnusedParameter]
-    emitted: list[object] = []
-    _ = updater.update_checked.connect(emitted.append)
+    emitted: list[UpdateInfo] = []
+    _ = updater.update_info_updated.connect(emitted.append)
 
     updater.check_update()
 
-    assert len(emitted) == 1
-    assert isinstance(emitted[0], NetworkError)
-
-
-def test_offline_update_aborts(offline: NetworkClient, updater: Updater) -> None:  # pyright: ignore[reportUnusedParameter]
-    states: list[Downloaded] = []
-    started: list[int] = []
-    _ = updater.downloaded.connect(states.append)
-    _ = updater.download_started.connect(lambda: started.append(1))
-
-    release = GithubLatestRelease.model_validate_json(
-        release_payload("99.0.0", "https://example.com/x.exe", 10)
-    )
-    updater.update(release)
-
-    assert started == [1]
-    assert states[-1].aborted is True
-    assert states[-1].completed is False
+    assert len(emitted) == 2, "checking and the error result should both be emitted"
+    assert emitted[-1].state is UpdateStatus.none
+    assert isinstance(emitted[-1].error, NetworkError)
+    assert emitted[-1].update_available is None
 
 
 # endregion
@@ -178,7 +223,6 @@ def test_get_latest_release_reports_bad_payload(
     updater: Updater,
     pump_until: Pump,
 ) -> None:
-    # The server default payload does not match the model.
     NetworkClient.set_base_url("github", base_url)
     results: list[GithubLatestRelease | NetworkError] = []
 
@@ -192,39 +236,44 @@ def test_get_latest_release_reports_bad_payload(
 def test_check_update_reports_newer_release(
     client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
     base_url: str,
-    http_server: Any,  # pyright: ignore[reportExplicitAny, reportAny]
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
     updater: Updater,
     pump_until: Pump,
 ) -> None:
     http_server.release_payload = release_payload("999.0.0", f"{base_url}/file/10", 10)
     NetworkClient.set_base_url("github", base_url)
-    emitted: list[object] = []
-    _ = updater.update_checked.connect(emitted.append)
+    emitted: list[UpdateInfo] = []
+    _ = updater.update_info_updated.connect(emitted.append)
 
     updater.check_update()
 
-    assert pump_until(lambda: len(emitted) == 1)
-    assert isinstance(emitted[0], GithubLatestRelease)
+    assert pump_until(lambda: emitted and emitted[-1].state is UpdateStatus.update_checked)
+    info = emitted[-1]
+    assert info.update_available is True
+    assert info.latest_release is not None
+    assert info.latest_release.tag_name == "999.0.0"
+    assert info.error is None
 
 
 def test_check_update_reports_up_to_date(
     client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
     base_url: str,
-    http_server: Any,  # pyright: ignore[reportExplicitAny, reportAny]
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
     updater: Updater,
     pump_until: Pump,
 ) -> None:
     http_server.release_payload = release_payload(
-        str(APPLICATION_VERSION.major), f"{base_url}/file/10", 10
+        str(APPLICATION_VERSION), f"{base_url}/file/10", 10
     )
     NetworkClient.set_base_url("github", base_url)
-    emitted: list[object] = []
-    _ = updater.update_checked.connect(emitted.append)
+    emitted: list[UpdateInfo] = []
+    _ = updater.update_info_updated.connect(emitted.append)
 
     updater.check_update()
 
-    assert pump_until(lambda: len(emitted) == 1)
-    assert emitted == [None], "same major version should count as up to date"
+    assert pump_until(lambda: emitted and emitted[-1].state is UpdateStatus.update_checked)
+    assert emitted[-1].update_available is False
+    assert emitted[-1].latest_release is None
 
 
 # endregion
@@ -233,62 +282,62 @@ def test_check_update_reports_up_to_date(
 # region downloading
 
 
-def test_update_downloads_installer(
+def test_download_verifies_and_completes(
     client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
     base_url: str,
-    file_size: int,
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
     updater: Updater,
     pump_until: Pump,
-    tmp_path: Path,  # pyright: ignore[reportUnusedParameter]
 ) -> None:
-    release = GithubLatestRelease.model_validate_json(
-        release_payload("99.0.0", f"{base_url}/file/{file_size}", file_size)
+    archive = make_archive({"Prospero/Prospero": b"binary"})
+    digest = "sha256:" + sha256(archive).hexdigest()
+    http_server.update_bytes = archive
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/update.tar.gz", len(archive), digest=digest),
     )
-    states: list[Downloaded] = []
-    _ = updater.downloaded.connect(states.append)
 
-    updater.update(release)
-
-    assert pump_until(lambda: any(s.completed for s in states)), "installer never downloaded"
-    final = states[-1]
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.downloaded
+    ), "archive never downloaded"
+    final = updater.update_info.download_progress
+    assert final is not None
     assert final.completed is True
-    assert final.downloaded_size == file_size
+    assert final.downloaded_size == len(archive)
     assert final.file_path.exists()
-    assert final.file_path.stat().st_size == file_size
-    # The temporary .part file must not survive a completed download.
+    assert final.file_path.stat().st_size == len(archive)
     assert not list(final.file_path.parent.glob("*.part"))
 
 
-def test_second_update_is_ignored_while_one_runs(
+def test_second_download_is_ignored_while_one_runs(
     client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
     base_url: str,
     file_size: int,
     updater: Updater,
     pump_until: Pump,
 ) -> None:
-    release = GithubLatestRelease.model_validate_json(
-        release_payload("99.0.0", f"{base_url}/slow/{file_size}", file_size)
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/slow/{file_size}", file_size),
     )
-    started: list[int] = []
-    states: list[Downloaded] = []
-    _ = updater.download_started.connect(lambda: started.append(1))
-    _ = updater.downloaded.connect(states.append)
 
-    updater.update(release)
-    updater.update(release)
-
-    assert started == [1], "a second update should not start while one is in flight"
-    assert pump_until(lambda: any(s.downloaded_size > 0 for s in states))
+    assert updater.download(release) is True
+    assert updater.download(release) is False
+    assert pump_until(
+        lambda: (dp := updater.update_info.download_progress) is not None
+        and dp.downloaded_size > 0
+    )
     updater.cancel_update()
 
 
 def test_cancel_update_when_idle_does_nothing(updater: Updater) -> None:
-    states: list[Downloaded] = []
-    _ = updater.downloaded.connect(states.append)
+    emitted: list[UpdateInfo] = []
+    _ = updater.update_info_updated.connect(emitted.append)
 
     updater.cancel_update()
 
-    assert states == []
+    assert emitted == []
 
 
 def test_cancel_update_stops_in_flight_download(
@@ -298,19 +347,332 @@ def test_cancel_update_stops_in_flight_download(
     updater: Updater,
     pump_until: Pump,
 ) -> None:
-    release = GithubLatestRelease.model_validate_json(
-        release_payload("99.0.0", f"{base_url}/slow/{file_size}", file_size)
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/slow/{file_size}", file_size),
     )
-    states: list[Downloaded] = []
-    _ = updater.downloaded.connect(states.append)
 
-    updater.update(release)
-    assert pump_until(lambda: any(s.downloaded_size > 0 for s in states)), "nothing arrived"
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: (dp := updater.update_info.download_progress) is not None
+        and dp.downloaded_size > 0
+    ), "nothing arrived"
     updater.cancel_update()
 
-    assert pump_until(lambda: any(s.aborted for s in states)), "cancel was never reported"
-    assert not any(s.completed for s in states)
-    assert updater._update_progress is False  # pyright: ignore[reportPrivateUsage]
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.download_aborted
+    ), "cancel was never reported"
+    assert updater.update_info.download_progress is not None
+    assert updater.update_info.download_progress.aborted is True
+    assert updater.update_info.download_progress.completed is False
+    assert updater.update_info.error is None
 
+
+def test_download_can_be_retried_after_cancel(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    base_url: str,
+    file_size: int,
+    updater: Updater,
+    pump_until: Pump,
+) -> None:
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/slow/{file_size}", file_size),
+    )
+
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: (dp := updater.update_info.download_progress) is not None
+        and dp.downloaded_size > 0
+    )
+    updater.cancel_update()
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.download_aborted
+    )
+
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.downloading
+        and (dp := updater.update_info.download_progress) is not None
+        and dp.downloaded_size > 0
+    ), "retry never started transferring"
+    updater.cancel_update()
+
+
+def test_size_mismatch_does_not_install(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    base_url: str,
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
+    updater: Updater,
+    pump_until: Pump,
+) -> None:
+    archive = make_archive({"Prospero/Prospero": b"binary"})
+    http_server.update_bytes = archive
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/update.tar.gz", len(archive) + 1),
+    )
+
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.update_checked
+        and updater.update_info.error is not None
+    )
+    assert "size mismatch" in str(updater.update_info.error)
+
+
+def test_digest_mismatch_does_not_install(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    base_url: str,
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
+    updater: Updater,
+    pump_until: Pump,
+) -> None:
+    archive = make_archive({"Prospero/Prospero": b"binary"})
+    http_server.update_bytes = archive
+    release = release_from(
+        base_url,
+        release_payload(
+            "99.0.0",
+            f"{base_url}/update.tar.gz",
+            len(archive),
+            digest="sha256:" + "0" * 64,
+        ),
+    )
+
+    assert updater.download(release) is True
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.update_checked
+        and updater.update_info.error is not None
+    )
+    assert "digest mismatch" in str(updater.update_info.error)
+
+
+# endregion
+
+
+# region installing
+
+
+def test_download_refuses_outside_an_installed_build(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    base_url: str,
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("updater._can_self_update", lambda: False)
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/update.tar.gz", 10),
+    )
+
+    assert updater.download(release) is False
+    assert updater.update_info.state is UpdateStatus.update_checked
+    assert "installed build" in str(updater.update_info.error)
+
+
+def test_download_auto_installs_and_activates(
+    client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
+    base_url: str,
+    http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+    pump_until: Pump,
+) -> None:
+    archive = make_archive({
+        "Prospero/Prospero": b"binary",
+        "Prospero/_internal/data.txt": b"payload",
+    })
+    digest = "sha256:" + sha256(archive).hexdigest()
+    http_server.update_bytes = archive
+    release = release_from(
+        base_url,
+        release_payload("99.0.0", f"{base_url}/update.tar.gz", len(archive), digest=digest),
+    )
+
+    committed: list[str] = []
+    restarted: list[int] = []
+    monkeypatch.setattr(Updater, "install", ORIGINAL_INSTALL)
+    monkeypatch.setattr("updater.commit_install", lambda value: committed.append(value) or True)
+    monkeypatch.setattr("updater.restart_app", lambda: restarted.append(1) or True)
+
+    assert updater.download(release) is True
+    assert pump_until(lambda: bool(committed)), "download was never installed and activated"
+    assert committed == [release.directory_version()]
+    assert pump_until(lambda: bool(restarted)), "installer never requested a restart"
+    assert updater.update_info.state is UpdateStatus.restart_queue
+    assert (version_dir(release.directory_version()) / "Prospero" / APP_EXECUTABLE_NAME).is_file()
+
+
+def test_install_extracts_a_versioned_directory(
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    pump_until: Pump,
+) -> None:
+    archive = make_archive(
+        {
+            "Prospero/Prospero": b"binary",
+            "Prospero/_internal/data.txt": b"payload",
+            "install.sh": b"ignored",
+        }
+    )
+    archive_path = tmp_path / archive_name()
+    archive_path.write_bytes(archive)
+
+    release = GithubLatestRelease.model_validate_json(
+        release_payload("99.0.0", "https://example.com/update", len(archive))
+    )
+    version = release.directory_version()
+    updater.update_info.state = UpdateStatus.downloaded
+    updater.update_info.latest_release = release
+    updater._install_version = version  # pyright: ignore[reportPrivateUsage]
+
+    committed: list[str] = []
+    restarted: list[int] = []
+
+    def commit(value: str) -> bool:
+        committed.append(value)
+        return True
+
+    monkeypatch.setattr("updater.commit_install", commit)
+    monkeypatch.setattr("updater.restart_app", lambda: restarted.append(1) or True)
+
+    updater._install_worker(version, archive_path)  # pyright: ignore[reportPrivateUsage]
+
+    assert pump_until(lambda: bool(committed)), "installer never committed the version"
+    assert committed == [version]
+    assert pump_until(lambda: bool(restarted)), "installer never requested a restart"
+    assert (version_dir(version) / "Prospero" / APP_EXECUTABLE_NAME).is_file()
+    assert (version_dir(version) / "Prospero" / "_internal" / "data.txt").is_file()
+    assert not (version_dir(version) / "install.sh").exists()
+    assert app_executable(version).exists()
+    assert updater.update_info.state is UpdateStatus.restart_queue
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="Linux tar archives preserve PyInstaller symlinks")
+def test_install_preserves_safe_relative_symlinks(
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    pump_until: Pump,
+) -> None:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+        executable = tarfile.TarInfo("Prospero/Prospero")
+        executable.size = 6
+        executable.mode = 0o755
+        archive_file.addfile(executable, io.BytesIO(b"binary"))
+
+        # Real PyInstaller output uses links such as this into PySide6/Qt/lib.
+        link = tarfile.TarInfo("Prospero/_internal/libQt6Core.so.6")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "PySide6/Qt/lib/libQt6Core.so.6"
+        archive_file.addfile(link)
+
+        target = tarfile.TarInfo("Prospero/_internal/PySide6/Qt/lib/libQt6Core.so.6")
+        target.size = 7
+        target.mode = 0o755
+        archive_file.addfile(target, io.BytesIO(b"payload"))
+
+    archive = buffer.getvalue()
+    archive_path = tmp_path / archive_name()
+    archive_path.write_bytes(archive)
+    release = GithubLatestRelease.model_validate_json(
+        release_payload("99.0.0", "https://example.com/update", len(archive))
+    )
+    version = release.directory_version()
+    updater.update_info.state = UpdateStatus.downloaded
+    updater.update_info.latest_release = release
+    updater._install_version = version  # pyright: ignore[reportPrivateUsage]
+    committed: list[str] = []
+    monkeypatch.setattr("updater.commit_install", lambda value: committed.append(value) or True)
+    monkeypatch.setattr("updater.restart_app", lambda: True)
+
+    updater._install_worker(version, archive_path)  # pyright: ignore[reportPrivateUsage]
+
+    assert pump_until(lambda: bool(committed)), "installer never committed the version"
+    extracted = version_dir(version) / "Prospero" / "_internal" / "libQt6Core.so.6"
+    assert extracted.is_symlink()
+    assert extracted.read_bytes() == b"payload"
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="Linux tar archives preserve PyInstaller symlinks")
+def test_install_rejects_escaping_symlinks(
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    pump_until: Pump,
+) -> None:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+        executable = tarfile.TarInfo("Prospero/Prospero")
+        executable.size = 6
+        executable.mode = 0o755
+        archive_file.addfile(executable, io.BytesIO(b"binary"))
+
+        link = tarfile.TarInfo("Prospero/evil")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "../../outside"
+        archive_file.addfile(link)
+
+    archive = buffer.getvalue()
+    archive_path = tmp_path / archive_name()
+    archive_path.write_bytes(archive)
+    release = GithubLatestRelease.model_validate_json(
+        release_payload("99.0.0", "https://example.com/update", len(archive))
+    )
+    version = release.directory_version()
+    updater.update_info.state = UpdateStatus.downloaded
+    updater.update_info.latest_release = release
+    updater._install_version = version  # pyright: ignore[reportPrivateUsage]
+    committed: list[str] = []
+    monkeypatch.setattr("updater.commit_install", lambda value: committed.append(value) or True)
+    monkeypatch.setattr("updater.restart_app", lambda: True)
+
+    updater._install_worker(version, archive_path)  # pyright: ignore[reportPrivateUsage]
+
+    assert pump_until(lambda: updater.update_info.error is not None)
+    assert committed == []
+    assert not (version_dir(version) / "outside").exists()
+
+
+def test_install_rejects_path_traversal(
+    updater: Updater,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    pump_until: Pump,
+) -> None:
+    if IS_WINDOWS:
+        archive = make_archive({"Prospero/Prospero": b"binary", "Prospero/../../evil": b"bad"})
+    else:
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+            good = tarfile.TarInfo("Prospero/Prospero")
+            good.size = 6
+            archive_file.addfile(good, io.BytesIO(b"binary"))
+            evil = tarfile.TarInfo("../evil")
+            evil.size = 3
+            archive_file.addfile(evil, io.BytesIO(b"bad"))
+        archive = buffer.getvalue()
+
+    archive_path = tmp_path / archive_name()
+    archive_path.write_bytes(archive)
+    release = GithubLatestRelease.model_validate_json(
+        release_payload("99.0.0", "https://example.com/update", len(archive))
+    )
+    version = release.directory_version()
+    updater.update_info.state = UpdateStatus.downloaded
+    updater.update_info.latest_release = release
+    updater._install_version = version  # pyright: ignore[reportPrivateUsage]
+    committed: list[str] = []
+    monkeypatch.setattr("updater.commit_install", lambda value: committed.append(value) or True)
+    monkeypatch.setattr("updater.restart_app", lambda: True)
+
+    updater._install_worker(version, archive_path)  # pyright: ignore[reportPrivateUsage]
+
+    assert pump_until(lambda: updater.update_info.error is not None)
+    assert committed == []
+    assert not (tmp_path / "evil").exists()
 
 # endregion

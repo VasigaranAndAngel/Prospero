@@ -233,6 +233,34 @@ def test_cancel_download_removes_partial_and_reports_aborted(
     assert not list(tmp_path.glob("*.part")), "part file should be removed"
 
 
+def test_retry_after_cancel_keeps_the_new_download_tracked(
+    client: NetworkClient,
+    base_url: str,
+    file_size: int,
+    tmp_path: Path,
+    pump_until: TPump,
+) -> None:
+    first: list[Downloaded] = []
+    second: list[Downloaded] = []
+    url = f"{base_url}/slow/{file_size}"
+    first_target = tmp_path / "first.bin"
+    second_target = tmp_path / "second.bin"
+
+    client.download(url, first_target, first.append)
+    assert pump_until(lambda: any(s.downloaded_size > 0 for s in first)), "nothing arrived"
+
+    client.cancel(url)
+    client.download(url, second_target, second.append)
+
+    assert pump_until(lambda: any(s.aborted for s in first)), "first cancel never reported"
+    assert url in client.active(), "late finish of the cancelled download dropped the retry"
+
+    client.cancel(url)
+    assert pump_until(lambda: any(s.aborted for s in second)), "retry cancel never reported"
+    assert not first_target.exists()
+    assert not second_target.exists()
+
+
 def test_download_into_unwritable_location_reports_aborted(
     client: NetworkClient, base_url: str, file_size: int, tmp_path: Path
 ) -> None:

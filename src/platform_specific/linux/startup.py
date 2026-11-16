@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from constants import APPLICATION_NAME, APPLICATION_PATH
+from platform_specific.paths import launcher_path
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ _ENTRY_PATH = _AUTOSTART_DIR / _ENTRY_NAME
 def _exec_command() -> list[str]:
     """Command a desktop session should run to start Prospero."""
     if getattr(sys, "frozen", False):
-        return [str(APPLICATION_PATH)]
+        launcher = launcher_path()
+        return [str(launcher if launcher.exists() else APPLICATION_PATH)]
     # src/platform_specific/linux/startup.py -> parents[2] is the src directory
     entry = Path(__file__).resolve().parents[2] / "main.py"
     return [sys.executable, str(entry)]

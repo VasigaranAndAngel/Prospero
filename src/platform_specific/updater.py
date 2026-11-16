@@ -1,17 +1,33 @@
-"""Installing a downloaded update the way the current platform expects."""
+"""Platform-specific pieces of the versioned update installer."""
 
 from __future__ import annotations
-
-from pathlib import Path
 
 from . import IS_LINUX, IS_WINDOWS, UnsupportedPlatformError
 
 if IS_WINDOWS:
-    from .windows.updater import FILE_MATCH_PAT, run_installer
+    from .windows.updater import (
+        APP_EXECUTABLE_NAME,
+        FILE_MATCH_PAT,
+        cleanup_old_versions,
+        commit_install,
+        restart_app,
+    )
 elif IS_LINUX:
-    from .linux.updater import FILE_MATCH_PAT, run_installer
+    from .linux.updater import (
+        APP_EXECUTABLE_NAME,
+        FILE_MATCH_PAT,
+        cleanup_old_versions,
+        commit_install,
+        restart_app,
+    )
 else:
     raise UnsupportedPlatformError("automatic update installation")
 
 
-__all__ = ["Path", "run_installer", "FILE_MATCH_PAT"]
+__all__ = [
+    "APP_EXECUTABLE_NAME",
+    "FILE_MATCH_PAT",
+    "cleanup_old_versions",
+    "commit_install",
+    "restart_app",
+]

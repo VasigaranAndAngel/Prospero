@@ -93,8 +93,8 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
         super().__init__(parent)
 
         self._manager: QNetworkAccessManager = QNetworkAccessManager(self)
-        self._transfers: dict[str, _Transfer] = {}
-        "In flight requests, keyed by url."
+        self._transfers: dict[int, _Transfer] = {}
+        "In flight requests, keyed by reply identity so retries cannot collide."
 
     @classmethod
     def user_agent(cls) -> str:
@@ -165,22 +165,23 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
 
     def active(self) -> list[str]:
         """Urls of the requests currently in flight."""
-        return list(self._transfers)
+        return [transfer.url for transfer in self._transfers.values()]
 
     def cancel(self, url: str) -> None:
-        """Cancels the in flight request for the given url, if any.
+        """Cancels every in flight request for the given url.
 
         Args:
-            url (str): The url of the request to cancel.
+            url (str): The url of the request(s) to cancel.
         """
-        if (transfer := self._transfers.get(url)) is not None:
-            logger.debug("Cancelling request: %s", url)
-            _ = transfer.reply.abort()
+        for transfer in list(self._transfers.values()):
+            if transfer.url == url:
+                logger.debug("Cancelling request: %s", url)
+                _ = transfer.reply.abort()
 
     def cancel_all(self) -> None:
         """Cancels every in flight request."""
-        for url in self.active():
-            self.cancel(url)
+        for transfer in list(self._transfers.values()):
+            _ = transfer.reply.abort()
 
     def fetch(
         self,
@@ -206,14 +207,15 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
             return
 
         reply = self._manager.get(self._build_request(uri, timeout_ms))
-        self._transfers[uri] = _Transfer(reply=reply, url=uri, started_at=time.time())
+        key = id(reply)
+        self._transfers[key] = _Transfer(reply=reply, url=uri, started_at=time.time())
         self.fetch_started.emit(uri)
         logger.debug("Fetching %s", uri)
 
         def _on_finished() -> None:
             error = self._reply_error(reply, uri)
             payload = bytes(reply.readAll().data()) if error is None else None
-            _ = self._transfers.pop(uri, None)
+            _ = self._transfers.pop(key, None)
             _ = self._deliver(uri, error if error is not None else bytes(payload or b""), callback)
 
         _ = reply.finished.connect(_on_finished)
@@ -272,7 +274,8 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
             tmp_path=tmp_path,
             file_path=file_path,
         )
-        self._transfers[uri] = transfer
+        key = id(reply)
+        self._transfers[key] = transfer
         self.download_started.emit(uri)
         logger.debug("Downloading %s to %s", uri, file_path)
 
@@ -291,7 +294,7 @@ class NetworkClient(QObject, metaclass=SingletonQObjectMeta):
             if transfer.finished:
                 return
             transfer.finished = True
-            _ = self._transfers.pop(uri, None)
+            _ = self._transfers.pop(key, None)
 
             error = self._reply_error(reply, uri)
             _ = self._close_handle(transfer)

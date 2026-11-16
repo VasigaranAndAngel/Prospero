@@ -8,11 +8,13 @@ scheduled task that launches Prospero at user logon.
 # NOTE: Avoid importing too much since this will be imported on --schtasks-handler mode.
 import atexit
 import logging
+import sys
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 from constants import APPLICATION_PATH, RUNNING_AS_ADMIN
 from platform_specific import CREATE_NO_WINDOW
+from platform_specific.paths import launcher_path
 
 logger = logging.getLogger(__name__)  # This logger will be used in both main and elevated process.
 
@@ -36,8 +38,21 @@ def _run(args: Sequence[str]):
     return success, output.strip()
 
 
+def _stable_entry_point() -> tuple[str, str]:
+    """Return the command and working directory used at logon.
+
+    Shortcuts and scheduled tasks must point at the stable launcher, never at a versioned
+    executable, otherwise an update would leave them pointing at a deleted version.
+    """
+    launcher = launcher_path()
+    if getattr(sys, "frozen", False) and launcher.is_file():
+        return str(launcher), str(launcher.parent)
+    return str(APPLICATION_PATH), str(APPLICATION_PATH.parent)
+
+
 def _add_task():
     """Create a scheduled task to run at logon for the current user. Returns True if success."""
+    executable, working_directory = _stable_entry_point()
     # fmt: off
     # args = [
     #     "schtasks.exe", "/Create",
@@ -48,7 +63,7 @@ def _add_task():
     # ]
     # fmt: on
     script = [
-        f'$action = New-ScheduledTaskAction -Execute "{APPLICATION_PATH}" -WorkingDirectory "{APPLICATION_PATH.parent}"',
+        f'$action = New-ScheduledTaskAction -Execute "{executable}" -WorkingDirectory "{working_directory}"',
         "$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME",
         "$setting = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries",
         f'Register-ScheduledTask -TaskName "{_TASK_NAME}" -Action $action -Settings $setting -Trigger $trigger',
