@@ -12,9 +12,10 @@ import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from enum import Enum, auto
+from functools import partial
 from hashlib import file_digest
 from pathlib import Path, PurePosixPath
-from typing import IO, ClassVar, Final, Literal
+from typing import IO, ClassVar, Final, Literal, TypeVar
 
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
@@ -40,6 +41,8 @@ from platform_specific.updater import (
 )
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 GITHUB_SERVICE: Final[str] = "github"
 "Service name used to register a base url override for the GitHub API."
@@ -86,7 +89,7 @@ class GithubLatestRelease(BaseModel):
     @field_validator("tag_name")
     @classmethod
     def _validate_tag_name(cls, value: str) -> str:
-        Version(value)
+        _ = Version(value)
         return value
 
     def get_version(self) -> Version:
@@ -186,18 +189,14 @@ def _can_self_update() -> bool:
 
 
 def _selected_members(
-    members: list[tuple[object, PurePosixPath]],
-) -> list[tuple[object, PurePosixPath]]:
+    members: list[tuple[T, PurePosixPath]],
+) -> list[tuple[T, PurePosixPath]]:
     """Select the ``Prospero/`` tree, or wrap a flat archive in one."""
     if any(path.parts[0] == APPLICATION_NAME.title() for _, path in members):
         return [
-            (member, path)
-            for member, path in members
-            if path.parts[0] == APPLICATION_NAME.title()
+            (member, path) for member, path in members if path.parts[0] == APPLICATION_NAME.title()
         ]
-    return [
-        (member, PurePosixPath(APPLICATION_NAME.title()) / path) for member, path in members
-    ]
+    return [(member, PurePosixPath(APPLICATION_NAME.title()) / path) for member, path in members]
 
 
 class Updater(QObject, metaclass=SingletonQObjectMeta):
@@ -239,9 +238,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         self.update_info: UpdateInfo = UpdateInfo(UpdateStatus.none)
         "Every UI required info. Mutable."
 
-        _ = self._install_event.connect(
-            self._emit_update_info, Qt.ConnectionType.QueuedConnection
-        )
+        _ = self._install_event.connect(self._emit_update_info, Qt.ConnectionType.QueuedConnection)
         _ = self._install_finished.connect(
             self._on_install_finished, Qt.ConnectionType.QueuedConnection
         )
@@ -407,9 +404,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                     self.update_info.error = None
                 else:
                     self.update_info.state = UpdateStatus.update_checked
-                    self.update_info.error = state.abort_reason or Exception(
-                        "Download aborted."
-                    )
+                    self.update_info.error = state.abort_reason or Exception("Download aborted.")
                     self._drop_download(immediate=True)
                 self._emit_update_info()
                 return
@@ -426,10 +421,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
             self._emit_update_info()
 
             # Verify size.
-            if (
-                not state.file_path.exists()
-                or state.file_path.stat().st_size != file_asset.size
-            ):
+            if not state.file_path.exists() or state.file_path.stat().st_size != file_asset.size:
                 self._fail_update(
                     Exception("Download aborted due to size mismatch."),
                     state=UpdateStatus.update_checked,
@@ -455,7 +447,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                     return
 
             # Start extraction automatically. The UI can still cancel before activation.
-            QTimer.singleShot(250, lambda p=state.file_path: self.install(p))
+            QTimer.singleShot(250, partial(self.install, state.file_path))
 
         self._network.download(url, file_path, _on_downloaded)
         return True
@@ -468,7 +460,9 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
             return False
         progress = self.update_info.download_progress
         if progress is None or progress.file_path != archive_path or not archive_path.is_file():
-            self.update_info.error = Exception("The downloaded update archive is no longer available.")
+            self.update_info.error = Exception(
+                "The downloaded update archive is no longer available."
+            )
             self.update_info.state = UpdateStatus.update_checked
             self.update_info.download_progress = None
             self._emit_update_info()
@@ -551,7 +545,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                 for info in archive.infolist()
                 if info.filename not in {"", ".", "./"}
             ]
-            selected = _selected_members(members)  # type: ignore[arg-type]
+            selected = _selected_members(members)
             files = [(info, path) for info, path in selected if not info.is_dir()]
             total = sum(info.file_size for info, _ in files)
             installed = 0
@@ -582,7 +576,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                 if member.islnk():
                     raise Exception(f"Hard links are not allowed in update archives: {member.name}")
                 members.append((member, _safe_member(member.name)))
-            selected = _selected_members(members)  # type: ignore[arg-type]
+            selected = _selected_members(members)
             files = [(member, path) for member, path in selected if member.isfile()]
             total = sum(member.size for member, _ in files)
             installed = 0
@@ -703,7 +697,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         if immediate:
             shutil.rmtree(directory, ignore_errors=True)
             return
-        QTimer.singleShot(1000, lambda d=directory: shutil.rmtree(d, ignore_errors=True))
+        QTimer.singleShot(1000, partial(shutil.rmtree, directory, ignore_errors=True))
 
     def cancel_update(self) -> None:
         state = self.update_info.state

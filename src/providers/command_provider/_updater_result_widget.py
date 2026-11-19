@@ -37,8 +37,6 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         )
         _ = self._checked_update_timeout.timeout.connect(self._on_checked_update_timeout)
 
-        self._update_name_and_description()
-
         _ = self.setProperty("_progress", 0.0)
         self._progress_anim: QPropertyAnimation = QPropertyAnimation(self, b"_progress", self)
         self._progress_anim.setDuration(500)
@@ -50,6 +48,9 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         self._progress2_anim.setDuration(500)
         self._progress2_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
         _ = self._progress2_anim.finished.connect(self.repaint)
+
+        self._update_name_and_description()
+
 
     def _on_update_info(self, _update_info: UpdateInfo) -> None:
         self._update_name_and_description()
@@ -95,7 +96,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                             else:
                                 desc = (
                                     f"Update {APPLICATION_NAME.title()} from {VERSION} to "
-                                    f"{ui.latest_release.tag_name}. Press Enter to install."
+                                    f"{ui.latest_release.tag_name}. Press Enter to download and install."
                                 )
                         case None:
                             desc = "Press Enter to check for updates."
