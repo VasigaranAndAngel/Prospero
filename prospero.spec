@@ -9,13 +9,26 @@ import sys
 _IS_WINDOWS = sys.platform == "win32"
 _ICON = "assets/icon/icon.ico" if _IS_WINDOWS else "assets/icon/icon.png"
 
+_HIDDEN_IMPORTS = [
+    "pydantic_settings",
+    "lzma",  # needed on both platforms for .tar.xz updates
+]
+
+if not _IS_WINDOWS:
+    _HIDDEN_IMPORTS += [
+        "pynput.keyboard._xorg",
+        "pynput.mouse._xorg",
+        "pynput._util.xorg",
+        "pynput._util.xorg_keysyms",
+    ]
+
 a = Analysis(
     ["src/main.py"],
     pathex=[],
     binaries=[],
     datas=[("assets", "assets")],
     # pydantic sometimes needs explicit hints; lzma is used by tarfile for .tar.xz updates.
-    hiddenimports=["pydantic_settings", "lzma"],
+    hiddenimports=_HIDDEN_IMPORTS,
     hookspath=[],
     excludes=[
         "PySide6.QtPdf",
