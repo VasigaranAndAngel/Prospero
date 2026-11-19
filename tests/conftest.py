@@ -42,7 +42,7 @@ class _Server(ThreadingHTTPServer):
     "Body served for any .whl path, so a synthetic wheel can be 'downloaded'."
 
     update_bytes: bytes = b""
-    "Body served for update archives (.zip and .tar.gz)."
+    "Body served for update archives (.tar.xz, .tar.gz and .zip)."
 
     @override
     def handle_error(self, request: object, client_address: object) -> None:
@@ -73,7 +73,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_all(cast("_Server", self.server).release_payload)
         elif path.endswith(".whl"):
             self._send_all(cast("_Server", self.server).wheel_bytes)
-        elif path.endswith((".zip", ".tar.gz")):
+        elif path.endswith((".tar.xz", ".tar.gz", ".zip")):
             self._send_all(cast("_Server", self.server).update_bytes)
         else:
             self._empty(404)

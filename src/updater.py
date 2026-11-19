@@ -33,7 +33,7 @@ from platform_specific.paths import (
 )
 from platform_specific.updater import (
     APP_EXECUTABLE_NAME,
-    FILE_MATCH_PAT,
+    FILE_MATCH_PATS,
     cleanup_old_versions,
     commit_install,
     restart_app,
@@ -169,6 +169,15 @@ def _safe_link_target(member: PurePosixPath, linkname: str) -> str:
     if not normalized.parts or normalized.parts[0] != app_root:
         raise ValueError(f"Link target escapes the app directory: {linkname!r}")
     return posixpath.relpath(str(normalized), str(member.parent))
+
+
+def _matching_assets(assets: list[_GithubAsset]) -> tuple[_GithubAsset, ...]:
+    """Return assets for the first platform pattern that matches, preferring XZ archives."""
+    for pattern in FILE_MATCH_PATS:
+        matches = tuple(asset for asset in assets if fnmatch.fnmatch(asset.name, pattern))
+        if matches:
+            return matches
+    return ()
 
 
 def _can_self_update() -> bool:
@@ -357,7 +366,7 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
         self._cancel_requested = False
 
         # select the asset
-        assets = tuple(filter(lambda x: fnmatch.fnmatch(x.name, FILE_MATCH_PAT), release.assets))
+        assets = _matching_assets(release.assets)
         if (x := len(assets)) != 1:
             logger.error(f"Aborting update due to {x} update assets found.")
             self.update_info.error = Exception(f"Update aborted due to {x} update assets found.")

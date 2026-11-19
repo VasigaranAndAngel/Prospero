@@ -14,7 +14,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[("assets", "assets")],
-    hiddenimports=["pydantic_settings"],  # pydantic sometimes needs explicit hints
+    # pydantic sometimes needs explicit hints; lzma is used by tarfile for .tar.xz updates.
+    hiddenimports=["pydantic_settings", "lzma"],
     hookspath=[],
     excludes=[
         "PySide6.QtPdf",

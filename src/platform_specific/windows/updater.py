@@ -22,8 +22,14 @@ from platform_specific.paths import (
 
 logger = logging.getLogger(__name__)
 
-FILE_MATCH_PAT: str = "*-windows-*.zip"
-"Release asset pattern for the Windows update archive."
+FILE_MATCH_PATS: tuple[str, ...] = (
+    "*-windows-*.tar.xz",
+    "*-windows-*.zip",
+)
+"Release asset patterns for Windows updates, in order of preference."
+
+FILE_MATCH_PAT: str = FILE_MATCH_PATS[0]
+"Preferred release asset pattern for the Windows update archive."
 
 APP_EXECUTABLE_NAME: str = "Prospero.exe"
 "Executable name inside a versioned app directory."
@@ -123,6 +129,7 @@ def cleanup_old_versions() -> None:
 __all__ = [
     "APP_EXECUTABLE_NAME",
     "FILE_MATCH_PAT",
+    "FILE_MATCH_PATS",
     "cleanup_old_versions",
     "commit_install",
     "restart_app",

@@ -58,22 +58,48 @@ jobs:
         id: installer
         shell: bash
         run: |
-          FILE=$(find dist -maxdepth 1 -name "*Setup*.exe" | head -n 1)
-          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          installer="dist/ProsperoSetup-${{ steps.version.outputs.version }}.exe"
+          if [[ ! -f "$installer" ]]; then
+            echo "Expected installer was not built: $installer" >&2
+            echo "Contents of dist:" >&2
+            ls -la dist >&2
+            exit 1
+          fi
+          echo "path=$installer" >> "$GITHUB_OUTPUT"
 
       - name: Package the Windows update archive
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          uv run python -c "import shutil; shutil.make_archive('Prospero-${{ steps.version.outputs.version }}-windows-x86_64', 'zip', root_dir='dist', base_dir='Prospero')"
+          uv run python - <<'PY'
+          import os
+          import tarfile
+
+          version = os.environ["VERSION"]
+          archive = f"Prospero-{version}-windows-x86_64.tar.xz"
+          with tarfile.open(archive, "w:xz", preset=6) as output:
+              output.add("dist/Prospero", arcname="Prospero")
+          PY
+
+      - name: Stage Windows release assets
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-windows
+          cp "${{ steps.installer.outputs.path }}" release-windows/
+          cp "Prospero-${VERSION}-windows-x86_64.tar.xz" release-windows/
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
           name: prospero-windows
-          path: |
-            ${{ steps.installer.outputs.path }}
-            Prospero-${{ steps.version.outputs.version }}-windows-x86_64.zip
+          path: release-windows/*
           if-no-files-found: error
+          compression-level: 9
 
   build-linux:
     runs-on: ubuntu-latest
@@ -115,19 +141,33 @@ jobs:
         run: bash -n packaging/linux/install.sh
 
       - name: Package tarball
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
           cp packaging/linux/install.sh dist/install.sh
           cp packaging/linux/prospero.desktop dist/prospero.desktop
-          printf '%s\n' "${{ steps.version.outputs.version }}" > dist/VERSION
-          tar -czf "Prospero-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz" \
+          printf '%s\n' "${VERSION}" > dist/VERSION
+          XZ_OPT='-6 -T0' tar -cJf "Prospero-${VERSION}-linux-x86_64.tar.xz" \
             -C dist Prospero install.sh prospero.desktop VERSION
+
+      - name: Stage Linux release asset
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-linux
+          cp "Prospero-${VERSION}-linux-x86_64.tar.xz" release-linux/
 
       - name: Upload tarball
         uses: actions/upload-artifact@v7.0.1
         with:
           name: prospero-linux
-          path: Prospero-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz
+          path: release-linux/*
           if-no-files-found: error
+          compression-level: 9
 
   release:
     needs: [build-windows, build-linux]
@@ -144,6 +184,21 @@ jobs:
       - name: List files to release
         run: ls -l dist
 
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pattern in \
+            'dist/ProsperoSetup-*.exe' \
+            'dist/Prospero-*-windows-x86_64.tar.xz' \
+            'dist/Prospero-*-linux-x86_64.tar.xz'
+          do
+            if ! compgen -G "$pattern" > /dev/null; then
+              echo "Missing expected release asset: $pattern" >&2
+              exit 1
+            fi
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3.0.3
         with:
@@ -152,3 +207,4 @@ jobs:
           draft: false
           prerelease: false
           files: dist/*
+          fail_on_unmatched_files: true

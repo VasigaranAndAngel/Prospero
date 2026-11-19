@@ -35,7 +35,8 @@ BAD_PAYLOAD: bytes = b'{"unexpected": true}'
 
 
 def archive_suffix() -> str:
-    return "windows-x86_64.zip" if IS_WINDOWS else "linux-x86_64.tar.gz"
+    platform = "windows" if IS_WINDOWS else "linux"
+    return f"{platform}-x86_64.tar.xz"
 
 
 def archive_name(tag: str = "99.0.0") -> str:
@@ -45,17 +46,21 @@ def archive_name(tag: str = "99.0.0") -> str:
 def make_archive(files: dict[str, bytes]) -> bytes:
     """Build a small update archive in the same shape the release workflow publishes."""
     buffer = io.BytesIO()
-    if IS_WINDOWS:
-        with zipfile.ZipFile(buffer, "w") as archive:
-            for name, data in files.items():
-                archive.writestr(name, data)
-    else:
-        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-            for name, data in files.items():
-                info = tarfile.TarInfo(name)
-                info.size = len(data)
-                info.mode = 0o755
-                archive.addfile(info, io.BytesIO(data))
+    with tarfile.open(fileobj=buffer, mode="w:xz") as archive:
+        for name, data in files.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = 0o755
+            archive.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def make_legacy_zip(files: dict[str, bytes]) -> bytes:
+    """Build an old-style ZIP update for fallback coverage."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
     return buffer.getvalue()
 
 
@@ -558,7 +563,7 @@ def test_install_preserves_safe_relative_symlinks(
     pump_until: Pump,
 ) -> None:
     buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+    with tarfile.open(fileobj=buffer, mode="w:xz") as archive_file:
         executable = tarfile.TarInfo("Prospero/Prospero")
         executable.size = 6
         executable.mode = 0o755
@@ -605,7 +610,7 @@ def test_install_rejects_escaping_symlinks(
     pump_until: Pump,
 ) -> None:
     buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+    with tarfile.open(fileobj=buffer, mode="w:xz") as archive_file:
         executable = tarfile.TarInfo("Prospero/Prospero")
         executable.size = 6
         executable.mode = 0o755
@@ -647,7 +652,7 @@ def test_install_rejects_path_traversal(
         archive = make_archive({"Prospero/Prospero": b"binary", "Prospero/../../evil": b"bad"})
     else:
         buffer = io.BytesIO()
-        with tarfile.open(fileobj=buffer, mode="w:gz") as archive_file:
+        with tarfile.open(fileobj=buffer, mode="w:xz") as archive_file:
             good = tarfile.TarInfo("Prospero/Prospero")
             good.size = 6
             archive_file.addfile(good, io.BytesIO(b"binary"))
