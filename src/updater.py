@@ -446,9 +446,6 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
                     )
                     return
 
-            # Start extraction automatically. The UI can still cancel before activation.
-            QTimer.singleShot(250, partial(self.install, state.file_path))
-
         self._network.download(url, file_path, _on_downloaded)
         return True
 
@@ -657,10 +654,10 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
             self._emit_update_info()
             return
 
-        self.update_info.state = UpdateStatus.restart_queue
+        # Activation is done; leave the restart to the user-facing control.
+        self.update_info.state = UpdateStatus.installed
         self._emit_update_info()
         self._drop_download(immediate=True)
-        QTimer.singleShot(400, self._restart)
 
     def _restart(self) -> None:
         restarted = False
@@ -675,10 +672,16 @@ class Updater(QObject, metaclass=SingletonQObjectMeta):
             )
             self._emit_update_info()
             return
+
         logger.debug("Quitting application for the update to complete.")
         app = QApplication.instance()
         if app is None:
             logger.warning("Failed to quit the application unexpectedly.")
+            self.update_info.state = UpdateStatus.installed
+            self.update_info.error = Exception(
+                "Update installed, but the application could not quit to restart."
+            )
+            self._emit_update_info()
             return
         app.quit()
 

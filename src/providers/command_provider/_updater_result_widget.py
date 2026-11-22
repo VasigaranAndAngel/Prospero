@@ -1,8 +1,16 @@
 from typing import cast, override
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer
-from PySide6.QtGui import QBrush, QColor, QLinearGradient, QPainter, QPaintEvent
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QEnterEvent,
+    QLinearGradient,
+    QPainter,
+    QPaintEvent,
+    QResizeEvent,
+)
+from PySide6.QtWidgets import QAbstractButton, QWidget
 
 from constants import APPLICATION_NAME, VERSION
 from data_objects import IconLoadMethod, LoadMethod
@@ -20,6 +28,90 @@ def readable_size(num: float) -> str:
             return f"{num:3.1f}{unit}"
         num /= 1024.0
     return f"{num:.1f}GiB"
+
+
+class AutoInstallToggle(QAbstractButton):
+    state_changed: Signal = Signal(bool)
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+
+        self.state: bool = False
+
+        _ = self.setProperty("_bg_color", self.palette().button().color())
+        self._color_anim: QPropertyAnimation = QPropertyAnimation(self, b"_bg_color", self)
+        self._color_anim.setDuration(500)
+        self._color_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        _ = self._color_anim.valueChanged.connect(self.repaint)
+
+        _ = self.setProperty("_state_anim", 0.0)
+        self._state_anim: QPropertyAnimation = QPropertyAnimation(self, b"_state_anim", self)
+        self._state_anim.setDuration(500)
+        self._state_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        _ = self._state_anim.finished.connect(self.repaint)
+
+        _ = self.setProperty("_hover_anim", 0.0)
+        self._hover_anim: QPropertyAnimation = QPropertyAnimation(self, b"_hover_anim", self)
+        self._hover_anim.setDuration(500)
+        self._hover_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        _ = self._hover_anim.valueChanged.connect(self.repaint)
+
+        _ = self.clicked.connect(self.toggle_state)
+
+    def set_state(self, state: bool) -> None:
+        self.state = state
+        self.state_changed.emit(state)
+        self._update_color()
+
+    def toggle_state(self) -> None:
+        self.set_state(not self.state)
+
+    def _update_color(self) -> None:
+        self._state_anim.stop()
+        self._color_anim.stop()
+        if self.state:
+            self._state_anim.setEndValue(1.0)
+            self._color_anim.setEndValue(QColor(30, 144, 255))
+        else:
+            self._state_anim.setEndValue(0.0)
+            self._color_anim.setEndValue(self.palette().button().color())
+        self._state_anim.start()
+        self._color_anim.start()
+
+    def _set_hover(self, hover: bool) -> None:
+        self._hover_anim.stop()
+        if hover:
+            self._hover_anim.setEndValue(1.0)
+        else:
+            self._hover_anim.setEndValue(0.0)
+        self._hover_anim.start()
+
+    @override
+    def enterEvent(self, event: QEnterEvent, /) -> None:
+        self._set_hover(True)
+        return super().enterEvent(event)
+
+    @override
+    def leaveEvent(self, event: QEvent, /) -> None:
+        self._set_hover(False)
+        return super().leaveEvent(event)
+
+    @override
+    def paintEvent(self, e: QPaintEvent, /) -> None:
+        hover = cast(float, self.property("_hover_anim"))
+        # TODO: Use darker or lighter according to color
+        color = cast(QColor, self.property("_bg_color")).lighter(100 + int(30 * hover))
+        diff_size = self.height() * cast(float, self.property("_state_anim") * 0.1)
+        rect = self.rect().toRectF().adjusted(diff_size, diff_size, -diff_size, -diff_size)
+        with QPainter(self) as p:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(color)
+            p.drawRoundedRect(rect, 5, 5)
+
+            p.setPen("white")
+            p.drawText(self.rect(), "Auto Install", Qt.AlignmentFlag.AlignCenter)
 
 
 class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
@@ -51,9 +143,27 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
 
         self._update_name_and_description()
 
+        self._auto_install_btn: AutoInstallToggle = AutoInstallToggle(self)
+        self._auto_install_btn.set_state(True)
+        _ = self._auto_install_btn.state_changed.connect(self._on_auto_install_state_change)
+        self._auto_install_btn.setFixedSize((s := int(self.height() / 1.75 * 2.5)), s)
+        self._auto_install_btn.move(self.width() - int(s * 2.5) - 10, (self.height() - s) // 2)
 
-    def _on_update_info(self, _update_info: UpdateInfo) -> None:
+    def _on_auto_install_state_change(self, state: bool) -> None:
+        if self._updater.update_info.state is UpdateStatus.downloaded and state:
+            self._start_installation()
+
+    def _on_update_info(self, update_info: UpdateInfo) -> None:
         self._update_name_and_description()
+        if update_info.state is UpdateStatus.downloaded and self._auto_install_btn.state:
+            self._start_installation()
+
+    def _start_installation(self) -> None:
+        dp = self._updater.update_info.download_progress
+        if dp is not None and dp.file_path.is_file():
+            _ = self._updater.install(dp.file_path)
+        else:
+            self._check_for_update()
 
     @staticmethod
     def _error_text(error: Exception | NetworkError | str) -> str:
@@ -79,7 +189,9 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                     pass
                 case UpdateStatus.update_checking:
                     name = "Check for update"
-                    desc = f"Checking if a new version of {APPLICATION_NAME.title()} is available..."
+                    desc = (
+                        f"Checking if a new version of {APPLICATION_NAME.title()} is available..."
+                    )
                     icon = IconLoadMethod(LoadMethod.loading)
                 case UpdateStatus.update_checked:
                     match ui.update_available:
@@ -170,9 +282,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
         total = readable_size(download_state.total_size)
         percent = f"{download_state.download_progress * 100:.1f}%"
         speed = (
-            f"{readable_size(download_state.speed)}/s"
-            if download_state.speed is not None
-            else ""
+            f"{readable_size(download_state.speed)}/s" if download_state.speed is not None else ""
         )
         return f"{state} {name}    {downloaded}/{total} ({percent})    {speed}".rstrip()
 
@@ -216,7 +326,11 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                 self._check_for_update()
             case UpdateStatus.installed:
                 self._updater.restart()
-            case UpdateStatus.update_checking | UpdateStatus.restart_queue | UpdateStatus.installation_queue:
+            case (
+                UpdateStatus.update_checking
+                | UpdateStatus.restart_queue
+                | UpdateStatus.installation_queue
+            ):
                 # Nothing useful to do; the operation is in flight or about to restart.
                 pass
             case (
@@ -235,11 +349,16 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                 else:
                     self._check_for_update()
             case UpdateStatus.downloaded:
-                dp = ui.download_progress
-                if dp is not None and dp.file_path.is_file():
-                    _ = self._updater.install(dp.file_path)
-                else:
-                    self._check_for_update()
+                self._start_installation()
+
+    @override
+    def resizeEvent(self, event: QResizeEvent, /) -> None:
+        super().resizeEvent(event)
+        size = int(event.size().height() / 1.7)
+        self._auto_install_btn.setFixedSize(int(size * 2.5), size)
+        self._auto_install_btn.move(
+            self.width() - int(size * 2.5) - 10, (self.height() - size) // 2
+        )
 
     @override
     def paintEvent(self, event: QPaintEvent, /) -> None:
