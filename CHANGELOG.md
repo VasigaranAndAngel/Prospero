@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.1-alpha.1 (2026-11-22)
+
+### Features
+
+- Linux uninstall script implementation
+  ([`458bbd6`](https://github.com/VasigaranAndAngel/Prospero/commit/458bbd6de29b6737fcc60e1b401605f03fc3a99e))
+
+
 ## v0.2.0-alpha.1 (2026-11-22)
 
 ### Bug Fixes
