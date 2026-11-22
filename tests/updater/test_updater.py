@@ -1,7 +1,8 @@
 """Tests for the updater state machine and update archive extraction.
 
-Downloads go through the fixture HTTP server. Installation is exercised separately by calling
-the worker directly, so no test depends on a real launcher or on QApplication quitting.
+Downloads go through the fixture HTTP server. Installation is exercised explicitly by the
+caller (or by calling the worker directly), so no test depends on a real launcher or on
+QApplication quitting.
 """
 
 import io
@@ -107,7 +108,7 @@ def default_server_state(http_server: Any) -> None:  # pyright: ignore[reportAny
 
 @pytest.fixture(autouse=True)
 def block_auto_install(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Download tests must not race the automatic installer timer."""
+    """Keep download-only tests isolated; the UI, not the updater, starts installation."""
     monkeypatch.setattr(Updater, "install", lambda self, path: True)
 
 
@@ -476,7 +477,7 @@ def test_download_refuses_outside_an_installed_build(
     assert "installed build" in str(updater.update_info.error)
 
 
-def test_download_auto_installs_and_activates(
+def test_download_then_explicit_install_and_restart(
     client: NetworkClient,  # pyright: ignore[reportUnusedParameter]
     base_url: str,
     http_server: Any,  # pyright: ignore[reportAny, reportExplicitAny]
@@ -497,15 +498,31 @@ def test_download_auto_installs_and_activates(
 
     committed: list[str] = []
     restarted: list[int] = []
+    quit_calls: list[int] = []
     monkeypatch.setattr(Updater, "install", ORIGINAL_INSTALL)
     monkeypatch.setattr("updater.commit_install", lambda value: committed.append(value) or True)
     monkeypatch.setattr("updater.restart_app", lambda: restarted.append(1) or True)
+    quitter = type("Quitter", (), {"quit": lambda self: quit_calls.append(1)})()
+    monkeypatch.setattr("updater.QApplication.instance", lambda: quitter)
 
     assert updater.download(release) is True
+    assert pump_until(
+        lambda: updater.update_info.state is UpdateStatus.downloaded
+    ), "download never completed"
+    downloaded = updater.update_info.download_progress
+    assert downloaded is not None
+
+    assert updater.install(downloaded.file_path) is True
     assert pump_until(lambda: bool(committed)), "download was never installed and activated"
+    assert updater.update_info.state is UpdateStatus.installed
     assert committed == [release.directory_version()]
-    assert pump_until(lambda: bool(restarted)), "installer never requested a restart"
-    assert updater.update_info.state is UpdateStatus.restart_queue
+    assert restarted == []
+    assert quit_calls == []
+
+    updater.restart()
+    assert pump_until(lambda: bool(restarted)), "restart was never requested"
+    assert updater.update_info.state is UpdateStatus.installed
+    assert quit_calls == [1]
     assert (version_dir(release.directory_version()) / "Prospero" / APP_EXECUTABLE_NAME).is_file()
 
 
@@ -535,6 +552,7 @@ def test_install_extracts_a_versioned_directory(
 
     committed: list[str] = []
     restarted: list[int] = []
+    quit_calls: list[int] = []
 
     def commit(value: str) -> bool:
         committed.append(value)
@@ -542,17 +560,25 @@ def test_install_extracts_a_versioned_directory(
 
     monkeypatch.setattr("updater.commit_install", commit)
     monkeypatch.setattr("updater.restart_app", lambda: restarted.append(1) or True)
+    quitter = type("Quitter", (), {"quit": lambda self: quit_calls.append(1)})()
+    monkeypatch.setattr("updater.QApplication.instance", lambda: quitter)
 
     updater._install_worker(version, archive_path)  # pyright: ignore[reportPrivateUsage]
 
     assert pump_until(lambda: bool(committed)), "installer never committed the version"
     assert committed == [version]
-    assert pump_until(lambda: bool(restarted)), "installer never requested a restart"
+    assert restarted == []
+    assert quit_calls == []
     assert (version_dir(version) / "Prospero" / APP_EXECUTABLE_NAME).is_file()
     assert (version_dir(version) / "Prospero" / "_internal" / "data.txt").is_file()
     assert not (version_dir(version) / "install.sh").exists()
     assert app_executable(version).exists()
-    assert updater.update_info.state is UpdateStatus.restart_queue
+    assert updater.update_info.state is UpdateStatus.installed
+
+    updater.restart()
+    assert pump_until(lambda: bool(restarted)), "restart was never requested"
+    assert updater.update_info.state is UpdateStatus.installed
+    assert quit_calls == [1]
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="Linux tar archives preserve PyInstaller symlinks")

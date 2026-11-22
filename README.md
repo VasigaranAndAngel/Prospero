@@ -35,11 +35,11 @@ Windows:
 Linux:
 
 1. Go to the [Releases](https://github.com/VasigaranAndAngel/Prospero/releases) page.
-2. Download the latest `Prospero-*-linux-x86_64.tar.gz` and extract it.
+2. Download the latest `Prospero-*-linux-x86_64.tar.xz` and extract it.
 3. From the extracted folder, run `./install.sh` to install it into `~/.local/opt/prospero` and add it to your application menu. You can also run `Prospero/Prospero` directly without installing.
 4. Press `Alt + Space` anywhere to open it.
 
-Prospero installs each release into its own version directory. Updates are downloaded and extracted next to the current version, then a stable launcher/`current` symlink switches to the new version and restarts the app. Because the layout changed, installations from before this release need one manual reinstall; user configuration and data are not touched.
+Prospero installs each release into its own version directory. Updates are downloaded and extracted next to the current version, then a stable launcher/`current` symlink switches to the new version. After installation, the app offers a restart you can trigger from the updater result. Because the layout changed, installations from before this release need one manual reinstall; user configuration and data are not touched.
 
 **Option 2: run from source**
 

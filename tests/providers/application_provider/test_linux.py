@@ -26,5 +26,13 @@ Icon=test
     app = apps[0]
     assert app.app_name == "Test App"
     assert app.launch is not None
-    assert app.launch.args == ["/usr/bin/testapp"]
+    assert app.launch.args == [
+        "setsid",
+        "-f",
+        "systemd-run",
+        "--user",
+        "--scope",
+        "--",
+        "/usr/bin/testapp",
+    ]
     assert app.launch.shell is False

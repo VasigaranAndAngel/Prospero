@@ -1709,12 +1709,12 @@ Check for new versions on GitHub and install them.
 <details>
 <summary><b>How to use</b></summary>
 
-Use the `Updater` command. The latest release is fetched, downloaded, verified, extracted into a new version directory, and the app restarts into it. Download and extraction both show progress in the result widget, and either phase can be cancelled with Enter.
+Use the `Updater` command. The latest release is fetched, verified, downloaded, and extracted into a new version directory. Download and extraction both show progress in the result widget, and either phase can be cancelled with Enter. Auto Install is on by default; turn it off in the result widget to install manually with Enter. After installation, press Enter to restart into the new version.
 
 <details>
 <summary><b>Developer notes</b></summary>
 
-`src/updater.py` fetches the latest release from the GitHub API and selects exactly one platform asset (`*-windows-*.zip` or `*-linux-*.tar.gz`). It verifies the advertised size and `sha256` digest, extracts with traversal checks into `versions/<version>/`, then asks the platform layer to activate it. Windows writes `pending.txt` and starts `ProsperoLauncher.exe --wait-pid <pid>`; the launcher waits for the old process, promotes `current.txt` and starts the new version. Linux atomically swaps the `current` symlink and restarts through `~/.local/bin/prospero`. Cleanup keeps the current and previous versions for rollback. Running from source can check for updates but refuses automatic installation.
+`src/updater.py` fetches the latest release from the GitHub API and selects the preferred platform asset (`*-windows-x86_64.tar.xz` or `*-linux-x86_64.tar.xz`), with `*-windows-x86_64.zip` and `*-linux-x86_64.tar.gz` kept as legacy fallbacks. It verifies the advertised size and `sha256` digest, then extracts with traversal checks into `versions/<version>/` when the UI requests installation. Windows writes `pending.txt` and starts `ProsperoLauncher.exe --wait-pid <pid>`; the launcher waits for the old process, promotes `current.txt` and starts the new version. Linux atomically swaps the `current` symlink. The restart is user-triggered from the result widget; running from source can check for updates but refuses installation. Cleanup keeps the current and previous versions for rollback.
 </details>
 </details>
 
