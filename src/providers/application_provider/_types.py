@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from data_objects import IconLoadMethod
+from utils.env import child_environment
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class Launch:
 
         _ = subprocess.Popen(
             args=cmd,
+            env=child_environment(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             shell=isinstance(cmd, str),
