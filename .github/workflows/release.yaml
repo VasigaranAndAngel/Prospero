@@ -137,8 +137,10 @@ jobs:
       - name: Build with PyInstaller
         run: uv run pyinstaller prospero.spec --clean --noconfirm
 
-      - name: Check the Linux installer script
-        run: bash -n packaging/linux/install.sh
+      - name: Check the Linux installer scripts
+        run: |
+          bash -n packaging/linux/install.sh
+          bash -n packaging/linux/uninstall.sh
 
       - name: Package tarball
         shell: bash
@@ -147,10 +149,12 @@ jobs:
         run: |
           set -euo pipefail
           cp packaging/linux/install.sh dist/install.sh
+          cp packaging/linux/uninstall.sh dist/uninstall.sh
           cp packaging/linux/prospero.desktop dist/prospero.desktop
           printf '%s\n' "${VERSION}" > dist/VERSION
           XZ_OPT='-6 -T0' tar -cJf "Prospero-${VERSION}-linux-x86_64.tar.xz" \
-            -C dist Prospero install.sh prospero.desktop VERSION
+            -C dist Prospero install.sh uninstall.sh prospero.desktop VERSION
+          tar -tJf "Prospero-${VERSION}-linux-x86_64.tar.xz" | grep -qx 'uninstall.sh'
 
       - name: Stage Linux release asset
         shell: bash

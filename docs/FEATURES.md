@@ -1715,6 +1715,8 @@ Use the `Updater` command. The latest release is fetched, verified, downloaded, 
 <summary><b>Developer notes</b></summary>
 
 `src/updater.py` fetches the latest release from the GitHub API and selects the preferred platform asset (`*-windows-x86_64.tar.xz` or `*-linux-x86_64.tar.xz`), with `*-windows-x86_64.zip` and `*-linux-x86_64.tar.gz` kept as legacy fallbacks. It verifies the advertised size and `sha256` digest, then extracts with traversal checks into `versions/<version>/` when the UI requests installation. Windows writes `pending.txt` and starts `ProsperoLauncher.exe --wait-pid <pid>`; the launcher waits for the old process, promotes `current.txt` and starts the new version. Linux atomically swaps the `current` symlink. The restart is user-triggered from the result widget; running from source can check for updates but refuses installation. Cleanup keeps the current and previous versions for rollback.
+
+The Linux tarball bundles `uninstall.sh` alongside `install.sh`. Installation copies it to the stable install root and records every path it used in `install-paths.env`, so custom `PROSPERO_INSTALL_ROOT`, `XDG_BIN_HOME` and `XDG_DATA_HOME` values are handled correctly. The uninstaller removes only the install root, launcher symlink, desktop entry and icon; settings and application data are preserved unless `--purge-data` is passed. The generated `.desktop` file also exposes an **Uninstall Prospero** desktop action for desktop environments that support context-menu actions.
 </details>
 </details>
 
