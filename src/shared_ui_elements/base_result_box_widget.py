@@ -66,8 +66,9 @@ class BaseResultBoxWidget(QWidget):
 
     @override
     def mouseDoubleClickEvent(self, event: QMouseEvent, /) -> None:
-        self.execute_execution_action(ExecutionAction.Trigger)
-        event.accept()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.execute_execution_action(ExecutionAction.Trigger)
+            event.accept()
 
 
 class ResultBox(BaseResultBoxWidget):
