@@ -2,6 +2,51 @@
 
 <!-- version list -->
 
+## v0.2.0-alpha.1 (2026-11-22)
+
+### Bug Fixes
+
+- Cancel download progress not working
+  ([`3008dc7`](https://github.com/VasigaranAndAngel/Prospero/commit/3008dc7d7b15ee968f58f894eac9d71372263364))
+
+- Import errors
+  ([`f94a166`](https://github.com/VasigaranAndAngel/Prospero/commit/f94a166010e37cf9d82796263dfad68d7ba648eb))
+
+- Select proper asset from github assets and verify size and digest
+  ([`2d17322`](https://github.com/VasigaranAndAngel/Prospero/commit/2d17322188f976e568eac0e98d39fb11ec7f7a6a))
+
+- Updater result widget handles errors correctly
+  ([`c82b2bd`](https://github.com/VasigaranAndAngel/Prospero/commit/c82b2bdc141f81eba474b9c9842ea7e7efe71d32))
+
+- Updater-widget bug fix and few improvements
+  ([`e9bbe07`](https://github.com/VasigaranAndAngel/Prospero/commit/e9bbe078ee17c779f2feb3aa58ed0afc1001c4c9))
+
+- Widgets execution happens double clicking with all mouse buttons instead just left double click
+  ([`ff73f25`](https://github.com/VasigaranAndAngel/Prospero/commit/ff73f25ac1121d6620c5dabf8158077c8cce9036))
+
+- Wrong asset matching pattern
+  ([`e37b8fd`](https://github.com/VasigaranAndAngel/Prospero/commit/e37b8fd544fff133890f4d87c96ec47c5e698430))
+
+### Features
+
+- Controlled-auto-install when updating
+  ([`c7112d4`](https://github.com/VasigaranAndAngel/Prospero/commit/c7112d4365faace8a30416a9312ab2357c0e449a))
+
+- Install updates through versioned directories
+  ([`dec2221`](https://github.com/VasigaranAndAngel/Prospero/commit/dec22212656402986ed05502c4db228d56468954))
+
+### Refactoring
+
+- Compress github artifacts reduce file sizes. changes to updater to fit with it.
+  ([`0ad41fa`](https://github.com/VasigaranAndAngel/Prospero/commit/0ad41fa2a9670b8df5e559ecc27c2161e96a3e9b))
+
+- Handling UI from updater signals refactored
+  ([`82a14ab`](https://github.com/VasigaranAndAngel/Prospero/commit/82a14ab8946fa49cc84ffbc3d40d3fcc52b3d706))
+
+- Inform the UI with single object and signal
+  ([`3a542d7`](https://github.com/VasigaranAndAngel/Prospero/commit/3a542d7958b7809fc3ea20ffb4fd32ec9f623b34))
+
+
 ## v0.1.0-alpha.6 (2026-11-04)
 
 ### Documentation
