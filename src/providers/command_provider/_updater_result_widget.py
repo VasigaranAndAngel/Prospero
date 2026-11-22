@@ -152,6 +152,7 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
     def _on_auto_install_state_change(self, state: bool) -> None:
         if self._updater.update_info.state is UpdateStatus.downloaded and state:
             self._start_installation()
+        self._update_name_and_description()
 
     def _on_update_info(self, update_info: UpdateInfo) -> None:
         self._update_name_and_description()
@@ -226,8 +227,12 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                     else:
                         desc = "Downloading... Press Enter to cancel."
                 case UpdateStatus.downloaded:
-                    name = "Updating"
-                    desc = "Download complete. Preparing to install..."
+                    if self._auto_install_btn.state:
+                        name = "Updating"
+                        desc = "Download complete. Preparing to install..."
+                    else:
+                        name = "Install"
+                        desc = "Download complete."
                     progress = 1.0
                 case UpdateStatus.download_aborted:
                     name = f"Update {APPLICATION_NAME.title()}"
@@ -254,7 +259,10 @@ class UpdaterResultWidget(ResultBox, metaclass=SingletonQObjectMeta):
                     desc = "Waiting to install..."
                 case UpdateStatus.restart_queue:
                     name = f"Restart {APPLICATION_NAME.title()}"
-                    desc = "Update installed. Restarting..."
+                    if self._auto_install_btn.state:
+                        desc = "Update installed. Ready to restart."
+                    else:
+                        desc = "Update installed. Restarting..."
                     progress = 1.0
 
         self.set_name(name)
