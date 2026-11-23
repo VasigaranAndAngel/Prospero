@@ -162,7 +162,8 @@ jobs:
           XZ_OPT='-6 -T0' tar -cJf "Prospero-${VERSION}-linux-x86_64.tar.xz" \
             -C dist "$package_root"
           tar -tJf "Prospero-${VERSION}-linux-x86_64.tar.xz" | \
-            grep -qx "$package_root/uninstall.sh"
+            awk -v expected="$package_root/uninstall.sh" \
+              '$0 == expected { found = 1 } END { exit !found }'
 
       - name: Stage Linux release asset
         shell: bash
