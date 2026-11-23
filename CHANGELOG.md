@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.1-alpha.2 (2026-11-23)
+
+### Bug Fixes
+
+- Launching applications with dirty env
+  ([`98502e9`](https://github.com/VasigaranAndAngel/Prospero/commit/98502e9cddb5050acef33a3cb6d63bfde131be62))
+
+
 ## v0.2.1-alpha.1 (2026-11-22)
 
 ### Features
