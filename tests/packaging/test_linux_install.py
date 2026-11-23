@@ -14,14 +14,14 @@ PACKAGING = REPO_ROOT / "packaging" / "linux"
 
 def _stage(tmp_path: Path) -> dict[str, Path]:
     """Create a fake release archive root with deliberately spaced paths."""
-    stage = tmp_path / "stage dir"
+    stage = tmp_path / "stage dir" / "Prospero-0.0.1"
     app = stage / "Prospero"
     icon = app / "_internal" / "assets" / "icon" / "icon.png"
     icon.parent.mkdir(parents=True)
-    (app / "Prospero").write_text("#!/bin/sh\nprintf '0.0.0.dev99\\n'\n")
+    (app / "Prospero").write_text("#!/bin/sh\nprintf '0.0.1\\n'\n")
     (app / "Prospero").chmod(0o755)
     icon.write_bytes(b"PNG")
-    (stage / "VERSION").write_text("0.0.0.dev99\n")
+    (stage / "VERSION").write_text("0.0.1\n")
     for name in ("install.sh", "uninstall.sh", "prospero.desktop"):
         (stage / name).write_bytes((PACKAGING / name).read_bytes())
 
@@ -73,6 +73,8 @@ def _write_user_files(paths: dict[str, Path]) -> tuple[Path, Path]:
 def test_install_creates_uninstaller_and_desktop_action(
     linux_install: dict[str, Path],
 ) -> None:
+    assert linux_install["stage"].name == "Prospero-0.0.1"
+
     root = linux_install["root"]
     uninstaller = root / "uninstall.sh"
     manifest = root / "install-paths.env"

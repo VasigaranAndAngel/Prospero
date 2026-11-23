@@ -526,17 +526,20 @@ def test_download_then_explicit_install_and_restart(
     assert (version_dir(release.directory_version()) / "Prospero" / APP_EXECUTABLE_NAME).is_file()
 
 
+@pytest.mark.parametrize("wrapper", [None, "Prospero-99.0.0"])
 def test_install_extracts_a_versioned_directory(
     updater: Updater,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     pump_until: Pump,
+    wrapper: str | None,
 ) -> None:
+    prefix = f"{wrapper}/" if wrapper else ""
     archive = make_archive(
         {
-            "Prospero/Prospero": b"binary",
-            "Prospero/_internal/data.txt": b"payload",
-            "install.sh": b"ignored",
+            f"{prefix}Prospero/Prospero": b"binary",
+            f"{prefix}Prospero/_internal/data.txt": b"payload",
+            f"{prefix}install.sh": b"ignored",
         }
     )
     archive_path = tmp_path / archive_name()

@@ -148,13 +148,21 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          cp packaging/linux/install.sh dist/install.sh
-          cp packaging/linux/uninstall.sh dist/uninstall.sh
-          cp packaging/linux/prospero.desktop dist/prospero.desktop
-          printf '%s\n' "${VERSION}" > dist/VERSION
+          package_root="Prospero-${VERSION}"
+          package_dir="dist/$package_root"
+          rm -rf "$package_dir"
+          mkdir -p "$package_dir"
+
+          cp -a dist/Prospero "$package_dir/"
+          cp packaging/linux/install.sh "$package_dir/install.sh"
+          cp packaging/linux/uninstall.sh "$package_dir/uninstall.sh"
+          cp packaging/linux/prospero.desktop "$package_dir/prospero.desktop"
+          printf '%s\n' "${VERSION}" > "$package_dir/VERSION"
+
           XZ_OPT='-6 -T0' tar -cJf "Prospero-${VERSION}-linux-x86_64.tar.xz" \
-            -C dist Prospero install.sh uninstall.sh prospero.desktop VERSION
-          tar -tJf "Prospero-${VERSION}-linux-x86_64.tar.xz" | grep -qx 'uninstall.sh'
+            -C dist "$package_root"
+          tar -tJf "Prospero-${VERSION}-linux-x86_64.tar.xz" | \
+            grep -qx "$package_root/uninstall.sh"
 
       - name: Stage Linux release asset
         shell: bash

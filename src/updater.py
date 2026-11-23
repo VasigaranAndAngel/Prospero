@@ -191,12 +191,24 @@ def _can_self_update() -> bool:
 def _selected_members(
     members: list[tuple[T, PurePosixPath]],
 ) -> list[tuple[T, PurePosixPath]]:
-    """Select the ``Prospero/`` tree, or wrap a flat archive in one."""
-    if any(path.parts[0] == APPLICATION_NAME.title() for _, path in members):
-        return [
-            (member, path) for member, path in members if path.parts[0] == APPLICATION_NAME.title()
+    """Select the ``Prospero/`` tree, unwrapping a single top-level release directory."""
+    roots = {path.parts[0] for _, path in members if path.parts}
+    if len(roots) == 1 and next(iter(roots)) != APPLICATION_NAME.title():
+        unwrapped = [
+            (member, PurePosixPath(*path.parts[1:]))
+            for member, path in members
+            if len(path.parts) > 1
         ]
-    return [(member, PurePosixPath(APPLICATION_NAME.title()) / path) for member, path in members]
+        if unwrapped:
+            members = unwrapped
+
+    app_root = APPLICATION_NAME.title()
+    in_app = [
+        (member, path) for member, path in members if path.parts and path.parts[0] == app_root
+    ]
+    if in_app:
+        return in_app
+    return [(member, PurePosixPath(app_root) / path) for member, path in members]
 
 
 class Updater(QObject, metaclass=SingletonQObjectMeta):

@@ -36,7 +36,7 @@ Linux:
 
 1. Go to the [Releases](https://github.com/VasigaranAndAngel/Prospero/releases) page.
 2. Download the latest `Prospero-*-linux-x86_64.tar.xz` and extract it.
-3. From the extracted folder, run `./install.sh` to install it into `~/.local/opt/prospero` and add it to your application menu. You can also run `Prospero/Prospero` directly without installing.
+3. Enter the extracted `Prospero-*` directory and run `./install.sh` to install it into `~/.local/opt/prospero` and add it to your application menu. You can also run `Prospero/Prospero` from there without installing.
 4. Press `Alt + Space` anywhere to open it.
 
 To uninstall on Linux, run `~/.local/opt/prospero/uninstall.sh`. KDE/GNOME-style desktops also show an **Uninstall Prospero** action in the application's context menu. Settings and app data are kept by default; pass `--purge-data` to delete them too.
